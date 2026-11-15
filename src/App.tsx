@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
 import { Search } from 'lucide-react';
+import { createDefaultSettings } from './data/defaultStoreSeed';
+import { auth } from './firebase';
+import {
+  fetchStorefrontWithFallback,
+  isAuthorizedAdminUser,
+  signOutAdminFirebase,
+} from './services/firestoreStore';
 import type { Product, ProductCategory, StoreSettings } from './types';
 import {
   filterAndSortProducts,
@@ -14,20 +22,10 @@ import { ProductCard } from './components/ProductCard';
 import { HowItWorksSection } from './components/HowItWorksSection';
 import { Footer } from './components/Footer';
 import { CheckoutModal } from './components/CheckoutModal';
-import { AdminLoginModal } from './components/AdminLoginModal';
+import { type AdminAuthMode, AdminLoginModal } from './components/AdminLoginModal';
 import { AdminDashboard } from './components/AdminDashboard';
 
-const DEFAULT_SETTINGS: StoreSettings = {
-  storeName: 'ToolCraft',
-  tagline: 'Official AI & Creative Pro Subscriptions',
-  whatsappNumber: '923234319689',
-  whatsappDisplay: '+92 3234319689',
-  supportHours: 'Support 24/7',
-  currencySymbol: 'Rs.',
-  deliverySla: 'Send payment screenshot on WhatsApp within 15 minutes for activation',
-  autoFetchEndpoints: [],
-  gateways: [],
-};
+const DEFAULT_SETTINGS: StoreSettings = createDefaultSettings();
 
 export default function App() {
   const [settings, setSettings] = useState<StoreSettings>(DEFAULT_SETTINGS);
@@ -49,13 +47,12 @@ export default function App() {
       return null;
     }
   });
+  const [adminAuthMode, setAdminAuthMode] = useState<AdminAuthMode>('server');
   const [viewMode, setViewMode] = useState<'store' | 'admin'>('store');
 
   const fetchStorefront = useCallback(async () => {
     try {
-      const res = await fetch('/api/storefront', { cache: 'no-store' });
-      if (!res.ok) throw new Error('Unable to load store catalog.');
-      const data = await res.json();
+      const data = await fetchStorefrontWithFallback();
       setSettings(data.settings);
       setProducts(data.products || []);
       setLoadError('');
@@ -76,10 +73,12 @@ export default function App() {
         credentials: 'include',
         headers,
       });
-      if (!res.ok) return;
+      const contentType = res.headers.get('content-type') || '';
+      if (!res.ok || !contentType.includes('application/json')) return;
       const data = await res.json();
       if (data.authenticated && data.username) {
-        setAdminUser(data.username);
+        setAdminUser((prev) => prev || data.username);
+        setAdminAuthMode((prev) => (prev === 'firebase' ? 'firebase' : 'server'));
       } else {
         setAdminToken(null);
         try {
@@ -97,6 +96,18 @@ export default function App() {
     fetchStorefront();
     checkAdminSession();
   }, [fetchStorefront, checkAdminSession]);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) return;
+      const authorized = await isAuthorizedAdminUser(user);
+      if (authorized) {
+        setAdminUser(user.email || user.displayName || 'Admin');
+        setAdminAuthMode('firebase');
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -121,8 +132,9 @@ export default function App() {
     }
   };
 
-  const saveAdminSession = (username: string, token?: string) => {
+  const saveAdminSession = (username: string, token?: string, mode: AdminAuthMode = 'server') => {
     setAdminUser(username);
+    setAdminAuthMode(mode);
     if (token) {
       setAdminToken(token);
       try {
@@ -134,6 +146,7 @@ export default function App() {
   };
 
   const handleAdminLogout = async () => {
+    await signOutAdminFirebase();
     try {
       await fetch('/api/admin/logout', { method: 'POST', credentials: 'include' });
     } catch {
@@ -141,6 +154,7 @@ export default function App() {
     }
     setAdminUser(null);
     setAdminToken(null);
+    setAdminAuthMode('server');
     try {
       window.sessionStorage.removeItem('toolcraft_admin_token');
     } catch {
@@ -154,13 +168,14 @@ export default function App() {
       <AdminDashboard
         username={adminUser}
         authToken={adminToken}
+        authMode={adminAuthMode}
         onExitToStore={() => {
           fetchStorefront();
           setViewMode('store');
         }}
         onLogout={handleAdminLogout}
         onStoreDataChanged={fetchStorefront}
-        onCredentialsUpdated={(nextUser, nextToken) => saveAdminSession(nextUser, nextToken)}
+        onCredentialsUpdated={(nextUser, nextToken) => saveAdminSession(nextUser, nextToken, 'server')}
       />
     );
   }
@@ -356,8 +371,8 @@ export default function App() {
       <AdminLoginModal
         open={adminLoginOpen}
         onClose={() => setAdminLoginOpen(false)}
-        onSuccess={(username, token) => {
-          saveAdminSession(username, token);
+        onSuccess={(username, token, mode) => {
+          saveAdminSession(username, token, mode);
           setAdminLoginOpen(false);
           setViewMode('admin');
         }}

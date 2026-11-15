@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import type { GatewayId, Order, Product, StoreSettings } from '../types';
+import { createOrderSmart } from '../services/firestoreStore';
 import {
   buildWhatsappOrderUrl,
   formatCurrency,
@@ -32,14 +33,14 @@ async function readImageFileAsDataUrl(file: File): Promise<string> {
     reader.onerror = () => reject(new Error('Could not read file.'));
     reader.onload = () => {
       const rawUrl = String(reader.result || '');
-      // Compress large images gently on client canvas to stay well within upload limits
-      if (file.size <= 900 * 1024) {
+      // Keep base64 screenshots comfortably below Firestore's 850KB field & 1MB document limit
+      if (file.size <= 350 * 1024 && rawUrl.length <= 650_000) {
         resolve(rawUrl);
         return;
       }
       const img = new Image();
       img.onload = () => {
-        const maxDim = 1200;
+        const maxDim = 960;
         const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
         const canvas = document.createElement('canvas');
         canvas.width = Math.max(1, Math.round(img.width * scale));
@@ -50,7 +51,11 @@ async function readImageFileAsDataUrl(file: File): Promise<string> {
           return;
         }
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', 0.82));
+        let compressed = canvas.toDataURL('image/jpeg', 0.72);
+        if (compressed.length > 780_000) {
+          compressed = canvas.toDataURL('image/jpeg', 0.55);
+        }
+        resolve(compressed);
       };
       img.onerror = () => resolve(rawUrl);
       img.src = rawUrl;
@@ -150,31 +155,27 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
     setError('');
 
     try {
-      const res = await fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productId: product.id,
-          customerName: customerName.trim(),
-          customerWhatsapp: customerWhatsapp.trim(),
-          customerEmail: customerEmail.trim() || undefined,
-          paymentMethod: activeGateway.id,
-          transactionRef: transactionRef.trim() || 'Screenshot Attached',
-          screenshotDataUrl,
-        }),
+      const result = await createOrderSmart({
+        product,
+        settings,
+        customerName: customerName.trim(),
+        customerWhatsapp: customerWhatsapp.trim(),
+        customerEmail: customerEmail.trim() || undefined,
+        paymentMethod: activeGateway.id,
+        transactionRef: transactionRef.trim() || 'Screenshot Attached',
+        screenshotDataUrl,
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Unable to submit order.');
-        return;
-      }
 
       setConfirmedOrder({
-        order: data.order,
-        whatsappUrl: data.whatsappUrl,
+        order: result.order,
+        whatsappUrl: result.whatsappUrl,
       });
-    } catch {
-      setError('Network error while submitting order. Please try again.');
+    } catch (err) {
+      const msg =
+        err instanceof Error && err.message
+          ? err.message
+          : 'Unable to submit order. Please try again.';
+      setError(msg);
     } finally {
       setSubmitting(false);
     }

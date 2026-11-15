@@ -32,6 +32,17 @@ import type {
   StoreSettings,
 } from '../types';
 import {
+  autoFetchToolInfoClientFallback,
+  BOOTSTRAPPED_ADMIN_EMAIL,
+  createProductFirestore,
+  deleteOrderFirestore,
+  deleteProductFirestore,
+  fetchAdminDashboardFirestore,
+  updateOrderFirestore,
+  updateProductFirestore,
+  updateSettingsFirestore,
+} from '../services/firestoreStore';
+import {
   computeDiscountPercent,
   computeInventorySummary,
   filterAndSortProducts,
@@ -42,12 +53,14 @@ import {
   resolveBrandKeyFromName,
   validateProductInput,
 } from '../utils/storeLogic';
+import type { AdminAuthMode } from './AdminLoginModal';
 import { StoreBrandLogo } from './StoreBrandLogo';
 import { ToolLogo } from './ToolLogo';
 
 interface AdminDashboardProps {
   username: string;
   authToken: string | null;
+  authMode?: AdminAuthMode;
   onExitToStore: () => void;
   onLogout: () => void;
   onStoreDataChanged: () => void;
@@ -96,6 +109,7 @@ const EMPTY_FORM: ProductFormState = {
 export function AdminDashboard({
   username,
   authToken,
+  authMode = 'server',
   onExitToStore,
   onLogout,
   onStoreDataChanged,
@@ -168,9 +182,29 @@ export function AdminDashboard({
     setLoading(true);
     setError('');
     try {
+      if (authMode === 'firebase') {
+        const data = await fetchAdminDashboardFirestore();
+        setProducts(data.products);
+        setOrders(data.orders);
+        setSettings(data.settings);
+        setSettingsDraft(data.settings);
+        setEndpointsText(
+          Array.isArray(data.settings.autoFetchEndpoints)
+            ? data.settings.autoFetchEndpoints.join('\n')
+            : ''
+        );
+        setNewUsername(data.username || username);
+        return;
+      }
+
       const res = await adminFetch('/api/admin/dashboard');
       if (res.status === 401) {
         onLogout();
+        return;
+      }
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        setError('Backend dashboard API is unavailable. Please sign in with Google (Admin).');
         return;
       }
       const data = await res.json();
@@ -191,8 +225,8 @@ export function AdminDashboard({
         setAiStatus(data.aiStatus);
       }
       setNewUsername(data.username || username);
-    } catch {
-      setError('Network error loading admin data.');
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'Network error loading admin data.');
     } finally {
       setLoading(false);
     }
@@ -254,29 +288,52 @@ export function AdminDashboard({
     setAutoFetching(true);
     setFormError('');
     try {
-      const res = await adminFetch('/api/admin/auto-tool-info', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      let data: {
+        logoKey?: string;
+        logoUrl?: string;
+        category?: ProductCategory;
+        planLabel?: string;
+        description?: string;
+        features?: string[];
+        source?: string;
+      } | null = null;
+
+      if (authMode === 'server') {
+        try {
+          const res = await adminFetch('/api/admin/auto-tool-info', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: cleanName,
+              domain: toolDomain.trim() || undefined,
+              endpoints: endpointsText,
+            }),
+          });
+          const contentType = res.headers.get('content-type') || '';
+          if (res.ok && contentType.includes('application/json')) {
+            data = await res.json();
+          }
+        } catch {
+          // Fall back to client lookup below
+        }
+      }
+
+      if (!data) {
+        data = await autoFetchToolInfoClientFallback({
           name: cleanName,
           domain: toolDomain.trim() || undefined,
-          endpoints: endpointsText,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setFormError(data.error || 'Unable to auto-fetch tool details.');
-        return;
+          endpointsText,
+        });
       }
 
       setFormState((prev) => ({
         ...prev,
-        logoKey: data.logoKey || resolveBrandKeyFromName(cleanName),
-        logoUrl: data.logoUrl || '',
-        category: data.category || prev.category,
-        planLabel: data.planLabel || prev.planLabel,
-        description: data.description || prev.description,
-        featuresText: Array.isArray(data.features)
+        logoKey: data?.logoKey || resolveBrandKeyFromName(cleanName),
+        logoUrl: data?.logoUrl || '',
+        category: data?.category || prev.category,
+        planLabel: data?.planLabel || prev.planLabel,
+        description: data?.description || prev.description,
+        featuresText: Array.isArray(data?.features)
           ? data.features.join('\n')
           : prev.featuresText,
       }));
@@ -288,7 +345,7 @@ export function AdminDashboard({
           : `Logo & details loaded for ${cleanName}`
       );
     } catch {
-      setFormError('Network error during auto-fetch.');
+      setFormError('Unable to auto-fetch tool details.');
     } finally {
       setAutoFetching(false);
     }
@@ -330,6 +387,22 @@ export function AdminDashboard({
     setFormError('');
     try {
       const isEdit = Boolean(formState.id);
+      if (authMode === 'firebase') {
+        const saved = isEdit && formState.id
+          ? await updateProductFirestore(formState.id, payload)
+          : await createProductFirestore(payload);
+        if (isEdit) {
+          setProducts((prev) => prev.map((p) => (p.id === saved.id ? saved : p)));
+          showToast(`Saved & live: ${saved.name}`);
+        } else {
+          setProducts((prev) => [saved, ...prev]);
+          showToast(`Added & live: ${saved.name}`);
+        }
+        setEditorOpen(false);
+        await Promise.resolve(onStoreDataChanged());
+        return;
+      }
+
       const url = isEdit ? `/api/admin/products/${formState.id}` : '/api/admin/products';
       const method = isEdit ? 'PATCH' : 'POST';
 
@@ -354,8 +427,8 @@ export function AdminDashboard({
 
       setEditorOpen(false);
       await Promise.resolve(onStoreDataChanged());
-    } catch {
-      setFormError('Network error saving tool.');
+    } catch (err) {
+      setFormError(err instanceof Error && err.message ? err.message : 'Network error saving tool.');
     } finally {
       setSavingProduct(false);
     }
@@ -385,6 +458,19 @@ export function AdminDashboard({
     setSavingQuickId(item.id);
     setError('');
     try {
+      if (authMode === 'firebase') {
+        const updated = await updateProductFirestore(item.id, {
+          price: parsedPrice,
+          originalPrice: parsedOriginal === null ? undefined : parsedOriginal,
+          offerLabel: quickOfferLabel.trim() || undefined,
+        });
+        setProducts((prev) => prev.map((p) => (p.id === item.id ? updated : p)));
+        setQuickEditId(null);
+        showToast(`Price & offer saved for ${updated.name}`);
+        await Promise.resolve(onStoreDataChanged());
+        return;
+      }
+
       const res = await adminFetch(`/api/admin/products/${item.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -403,8 +489,8 @@ export function AdminDashboard({
       setQuickEditId(null);
       showToast(`Price & offer saved for ${data.product.name}`);
       await Promise.resolve(onStoreDataChanged());
-    } catch {
-      setError('Network error updating price/offer.');
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'Network error updating price/offer.');
     } finally {
       setSavingQuickId(null);
     }
@@ -415,6 +501,14 @@ export function AdminDashboard({
     patch: Partial<Pick<Product, 'inStock' | 'active' | 'topSelling' | 'featuredInHero'>>
   ) => {
     try {
+      if (authMode === 'firebase') {
+        const updated = await updateProductFirestore(product.id, patch);
+        setProducts((prev) => prev.map((p) => (p.id === product.id ? updated : p)));
+        showToast(`Saved ${updated.name}`);
+        await Promise.resolve(onStoreDataChanged());
+        return;
+      }
+
       const res = await adminFetch(`/api/admin/products/${product.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -428,13 +522,21 @@ export function AdminDashboard({
       setProducts((prev) => prev.map((p) => (p.id === product.id ? data.product : p)));
       showToast(`Saved ${data.product.name}`);
       await Promise.resolve(onStoreDataChanged());
-    } catch {
-      setError('Network error updating tool.');
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'Network error updating tool.');
     }
   };
 
   const handleDeleteProduct = async (product: Product) => {
     try {
+      if (authMode === 'firebase') {
+        await deleteProductFirestore(product.id);
+        setProducts((prev) => prev.filter((p) => p.id !== product.id));
+        showToast(`Removed ${product.name}`);
+        await Promise.resolve(onStoreDataChanged());
+        return;
+      }
+
       const res = await adminFetch(`/api/admin/products/${product.id}`, {
         method: 'DELETE',
       });
@@ -446,13 +548,29 @@ export function AdminDashboard({
       setProducts((prev) => prev.filter((p) => p.id !== product.id));
       showToast(`Removed ${product.name}`);
       await Promise.resolve(onStoreDataChanged());
-    } catch {
-      setError('Network error deleting tool.');
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'Network error deleting tool.');
     }
   };
 
   const handleOrderStatusChange = async (orderId: string, status: OrderStatus) => {
     try {
+      if (authMode === 'firebase') {
+        await updateOrderFirestore(orderId, { status });
+        let updatedCode = orderId;
+        setOrders((prev) =>
+          prev.map((o) => {
+            if (o.id === orderId) {
+              updatedCode = o.orderCode;
+              return { ...o, status };
+            }
+            return o;
+          })
+        );
+        showToast(`Order ${updatedCode} marked ${status}`);
+        return;
+      }
+
       const res = await adminFetch(`/api/admin/orders/${orderId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -465,13 +583,20 @@ export function AdminDashboard({
       }
       setOrders((prev) => prev.map((o) => (o.id === orderId ? data.order : o)));
       showToast(`Order ${data.order.orderCode} marked ${status}`);
-    } catch {
-      setError('Network error updating order.');
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'Network error updating order.');
     }
   };
 
   const handleDeleteOrder = async (order: Order) => {
     try {
+      if (authMode === 'firebase') {
+        await deleteOrderFirestore(order.id);
+        setOrders((prev) => prev.filter((o) => o.id !== order.id));
+        showToast(`Deleted order ${order.orderCode}`);
+        return;
+      }
+
       const res = await adminFetch(`/api/admin/orders/${order.id}`, {
         method: 'DELETE',
       });
@@ -482,8 +607,8 @@ export function AdminDashboard({
       }
       setOrders((prev) => prev.filter((o) => o.id !== order.id));
       showToast(`Deleted order ${order.orderCode}`);
-    } catch {
-      setError('Network error deleting order.');
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'Network error deleting order.');
     }
   };
 
@@ -495,6 +620,20 @@ export function AdminDashboard({
     setSavingSettings(true);
     setError('');
     try {
+      if (authMode === 'firebase') {
+        const updatedSettings = await updateSettingsFirestore({ gateways: nextGateways });
+        setSettings(updatedSettings);
+        setSettingsDraft(updatedSettings);
+        const changed = updatedSettings.gateways.find((g) => g.id === gatewayId);
+        showToast(
+          changed
+            ? `${changed.label} ${changed.enabled ? 'activated' : 'disabled'} live`
+            : 'Gateway updated'
+        );
+        await Promise.resolve(onStoreDataChanged());
+        return;
+      }
+
       const res = await adminFetch('/api/admin/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -514,8 +653,8 @@ export function AdminDashboard({
           : 'Gateway updated'
       );
       await Promise.resolve(onStoreDataChanged());
-    } catch {
-      setError('Network error updating gateway.');
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'Network error updating gateway.');
     } finally {
       setSavingSettings(false);
     }
@@ -527,6 +666,19 @@ export function AdminDashboard({
     setFormError('');
     try {
       const parsedEndpoints = parseApiEndpointLines(endpointsText);
+      if (authMode === 'firebase') {
+        const updatedSettings = await updateSettingsFirestore({ autoFetchEndpoints: parsedEndpoints });
+        setSettings(updatedSettings);
+        setSettingsDraft(updatedSettings);
+        setEndpointsText(
+          Array.isArray(updatedSettings.autoFetchEndpoints)
+            ? updatedSettings.autoFetchEndpoints.join('\n')
+            : ''
+        );
+        showToast(`Saved ${parsedEndpoints.length} lookup API line(s)`);
+        return;
+      }
+
       const res = await adminFetch('/api/admin/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -545,8 +697,8 @@ export function AdminDashboard({
           : ''
       );
       showToast(`Saved ${parsedEndpoints.length} lookup API line(s)`);
-    } catch {
-      setError('Network error saving lookup APIs.');
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'Network error saving lookup APIs.');
     } finally {
       setSavingEndpoints(false);
     }
@@ -559,6 +711,23 @@ export function AdminDashboard({
     setError('');
     try {
       const parsedEndpoints = parseApiEndpointLines(endpointsText);
+      if (authMode === 'firebase') {
+        const updatedSettings = await updateSettingsFirestore({
+          ...settingsDraft,
+          autoFetchEndpoints: parsedEndpoints,
+        });
+        setSettings(updatedSettings);
+        setSettingsDraft(updatedSettings);
+        setEndpointsText(
+          Array.isArray(updatedSettings.autoFetchEndpoints)
+            ? updatedSettings.autoFetchEndpoints.join('\n')
+            : ''
+        );
+        showToast('Settings, WhatsApp & Lookup APIs saved live');
+        await Promise.resolve(onStoreDataChanged());
+        return;
+      }
+
       const res = await adminFetch('/api/admin/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -581,8 +750,8 @@ export function AdminDashboard({
       );
       showToast('Settings, WhatsApp & Lookup APIs saved live');
       await Promise.resolve(onStoreDataChanged());
-    } catch {
-      setError('Network error saving settings.');
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'Network error saving settings.');
     } finally {
       setSavingSettings(false);
     }
@@ -604,6 +773,7 @@ export function AdminDashboard({
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (authMode === 'firebase') return;
     setSavingSecurity(true);
     setError('');
     try {
@@ -1466,6 +1636,26 @@ export function AdminDashboard({
                 </button>
               </div>
             </form>
+          ) : authMode === 'firebase' ? (
+            <div className="bg-white border border-[#E2E5EA] rounded-xl p-5 sm:p-6 space-y-4 max-w-lg">
+              <div>
+                <h2 className="font-display text-lg font-bold text-[#0D0F12]">
+                  Firebase Cloud Admin Security
+                </h2>
+                <p className="text-xs text-[#525866] mt-0.5">
+                  Your storefront runs on Cloud Firestore and Firebase Google Authentication, so Admin logins, tools, gateways, and orders persist across Netlify, Cloudflare, and Cloud Run.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-lg bg-[#ECFDF5] border border-[#A7F3D0] space-y-1 text-xs text-[#065F46]">
+                <p className="font-semibold">Signed in with verified Google Admin account</p>
+                <p className="font-mono break-all">{username || BOOTSTRAPPED_ADMIN_EMAIL}</p>
+              </div>
+
+              <p className="text-xs text-[#525866] leading-relaxed">
+                Password rotation is managed through your Google Account security settings rather than a local server password.
+              </p>
+            </div>
           ) : (
             <form
               onSubmit={handleChangePassword}

@@ -1,0 +1,322 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "AI or creative software subscription listed in the storefront catalog.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "Video & Editing",
+            "AI Assistants",
+            "Design & Image",
+            "Audio & Voice",
+            "Productivity"
+          ]
+        },
+        "planLabel": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "price": {
+          "type": "number"
+        },
+        "originalPrice": {
+          "type": "number"
+        },
+        "offerLabel": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "topSelling": {
+          "type": "boolean"
+        },
+        "inStock": {
+          "type": "boolean"
+        },
+        "stock": {
+          "type": "number"
+        },
+        "logoKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "logoUrl": {
+          "type": "string",
+          "maxLength": 1024
+        },
+        "description": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 1000
+        },
+        "features": {
+          "type": "array"
+        },
+        "allowedGateways": {
+          "type": "array"
+        },
+        "featuredInHero": {
+          "type": "boolean"
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 64
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "category",
+        "planLabel",
+        "price",
+        "topSelling",
+        "inStock",
+        "stock",
+        "logoKey",
+        "description",
+        "features",
+        "featuredInHero",
+        "active",
+        "createdAt"
+      ]
+    },
+    "StorefrontSettings": {
+      "title": "StorefrontSettings",
+      "description": "Global storefront configuration including WhatsApp number, gateways, and custom lookup URLs.",
+      "type": "object",
+      "properties": {
+        "storeName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "tagline": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "whatsappNumber": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 20
+        },
+        "whatsappDisplay": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 30
+        },
+        "supportHours": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "currencySymbol": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10
+        },
+        "deliverySla": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "autoFetchEndpoints": {
+          "type": "array"
+        },
+        "gateways": {
+          "type": "array"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "storeName",
+        "tagline",
+        "whatsappNumber",
+        "whatsappDisplay",
+        "currencySymbol",
+        "deliverySla",
+        "gateways"
+      ]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer checkout order with WhatsApp contact and payment screenshot proof.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "orderCode": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 32
+        },
+        "productId": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "productName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "planLabel": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "amount": {
+          "type": "number"
+        },
+        "currencySymbol": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10
+        },
+        "customerName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "customerWhatsapp": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 20
+        },
+        "customerEmail": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "paymentMethod": {
+          "type": "string",
+          "enum": ["jazzcash", "easypaisa", "binance"]
+        },
+        "paymentMethodLabel": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 60
+        },
+        "transactionRef": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "screenshotDataUrl": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 850000
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "paid", "delivered", "cancelled"]
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 64
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "id",
+        "orderCode",
+        "productId",
+        "productName",
+        "planLabel",
+        "amount",
+        "currencySymbol",
+        "customerName",
+        "customerWhatsapp",
+        "paymentMethod",
+        "paymentMethodLabel",
+        "transactionRef",
+        "screenshotDataUrl",
+        "status",
+        "createdAt"
+      ]
+    },
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Authorized store administrator record keyed by Firebase Auth UID.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 160
+        },
+        "role": {
+          "type": "string",
+          "enum": ["admin"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "email", "role", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Catalog of AI and creative software subscription products."
+    },
+    "/storefront/{configId}": {
+      "schema": { "$ref": "#/entities/StorefrontSettings" },
+      "description": "Public storefront configuration (settings, payment gateways, WhatsApp number, lookup endpoints)."
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Private customer order submissions containing PII and payment screenshots."
+    },
+    "/admins/{adminUid}": {
+      "schema": { "$ref": "#/entities/AdminUser" },
+      "description": "Trusted administrator role documents."
+    }
+  }
+}
