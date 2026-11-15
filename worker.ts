@@ -64,8 +64,18 @@ const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 const KV_KEY = 'toolcraft_store_v2';
 const VALID_ORDER_STATUSES: OrderStatus[] = ['pending', 'paid', 'delivered', 'cancelled'];
 
-const RUNTIME_FALLBACK_SECRET = crypto.randomUUID() + '-' + crypto.randomUUID();
+let runtimeFallbackSecret: string | null = null;
 let memoryDb: WorkerDatabase | null = null;
+
+function getSigningSecret(env: Env): string {
+  if (env.SESSION_SECRET) {
+    return env.SESSION_SECRET;
+  }
+  if (!runtimeFallbackSecret) {
+    runtimeFallbackSecret = `${crypto.randomUUID()}-${crypto.randomUUID()}`;
+  }
+  return runtimeFallbackSecret;
+}
 
 function createInitialDb(env: Env): WorkerDatabase {
   const now = new Date().toISOString();
@@ -143,7 +153,7 @@ async function getHmacKey(secret: string): Promise<CryptoKey> {
 async function signSessionToken(username: string, env: Env): Promise<string> {
   const payload = { username, exp: Date.now() + SESSION_TTL_MS };
   const payloadB64 = toBase64Url(new TextEncoder().encode(JSON.stringify(payload)));
-  const key = await getHmacKey(env.SESSION_SECRET || RUNTIME_FALLBACK_SECRET);
+  const key = await getHmacKey(getSigningSecret(env));
   const sigBuf = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payloadB64));
   return `${payloadB64}.${toBase64Url(new Uint8Array(sigBuf))}`;
 }
@@ -159,7 +169,7 @@ async function verifySessionToken(
   if (!payloadB64 || !sigB64) return null;
 
   try {
-    const key = await getHmacKey(env.SESSION_SECRET || RUNTIME_FALLBACK_SECRET);
+    const key = await getHmacKey(getSigningSecret(env));
     const sigBytes = fromBase64Url(sigB64);
     const ok = await crypto.subtle.verify(
       'HMAC',
