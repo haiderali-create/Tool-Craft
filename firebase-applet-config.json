@@ -1,12 +1,10 @@
 {
-  "projectId": "gen-lang-client-0786213881",
-  "appId": "1:375634102590:web:7b8cb277acb5a9d774446f",
-  "apiKey": "AIzaSyAcQ1t_Or4kxMhDQxKHH2wD-hn2UXblf1Y",
-  "authDomain": "gen-lang-client-0786213881.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-toolcraftaitools-a0694f45-bdaf-463d-9865-e813799a945e",
-  "storageBucket": "gen-lang-client-0786213881.firebasestorage.app",
-  "messagingSenderId": "375634102590",
-  "measurementId": "",
-  "oAuthClientId": "375634102590-tmuhuf5h2uukiate62bnfg846b3fj1pn.apps.googleusercontent.com",
-  "recaptchaSiteKey": ""
+  "projectId": "tool-craft",
+  "appId": "1:651655618774:web:e6783bb26e292a17e8e977",
+  "apiKey": "AIzaSyDHz0lwtJH-ti1PGG6tFdKkSbSGDUrk8hw",
+  "authDomain": "tool-craft.firebaseapp.com",
+  "firestoreDatabaseId": "",
+  "storageBucket": "tool-craft.firebasestorage.app",
+  "messagingSenderId": "651655618774",
+  "measurementId": "G-D8YZ733GTH"
 }

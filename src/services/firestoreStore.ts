@@ -1,4 +1,9 @@
-import { signInWithPopup, signOut, type User } from 'firebase/auth';
+import {
+  sendEmailVerification,
+  signInWithEmailAndPassword,
+  signOut,
+  type User,
+} from 'firebase/auth';
 import {
   collection,
   deleteDoc,
@@ -18,7 +23,7 @@ import {
   createDefaultProducts,
   createDefaultSettings,
 } from '../data/defaultStoreSeed';
-import { auth, db, googleProvider, handleFirestoreError, OperationType } from '../firebase';
+import { auth, db, handleFirestoreError, OperationType } from '../firebase';
 import type {
   GatewayId,
   Order,
@@ -41,7 +46,11 @@ import {
   validateProductInput,
 } from '../utils/storeLogic';
 
-export const BOOTSTRAPPED_ADMIN_EMAIL = 'ha933123456789@gmail.com';
+export const BOOTSTRAPPED_ADMIN_EMAIL = (
+  import.meta.env.VITE_ADMIN_EMAIL || 'ha933123456789@gmail.com'
+)
+  .trim()
+  .toLowerCase();
 const STOREFRONT_COLLECTION = 'storefront';
 const STOREFRONT_DOC_ID = 'config';
 const PRODUCTS_COLLECTION = 'products';
@@ -214,16 +223,43 @@ export async function seedFirestoreIfEmpty(): Promise<void> {
   }
 }
 
-export async function signInAdminWithGoogle(): Promise<{ user: User; username: string }> {
-  const credential = await signInWithPopup(auth, googleProvider);
+export async function signInAdminWithEmailPassword(
+  email: string,
+  password: string
+): Promise<{ user: User; username: string }> {
+  const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
   const user = credential.user;
+
+  if (!user.emailVerified) {
+    let isListedAdmin = false;
+    try {
+      const adminSnap = await getDoc(doc(db, ADMINS_COLLECTION, user.uid));
+      isListedAdmin = adminSnap.exists();
+    } catch {
+      isListedAdmin = false;
+    }
+
+    if (!isListedAdmin) {
+      try {
+        await sendEmailVerification(user);
+      } catch {
+        // Ignore rate-limiting errors if verification email was recently sent
+      }
+      await signOut(auth);
+      throw new Error(
+        `Verification email sent to ${user.email || 'your email'}. Verify via the inbox link once, then sign in again.`
+      );
+    }
+  }
+
   const authorized = await isAuthorizedAdminUser(user);
   if (!authorized) {
     await signOut(auth);
     throw new Error(
-      `Google account (${user.email || 'unknown'}) is not authorized for Admin access. Sign in with ${BOOTSTRAPPED_ADMIN_EMAIL}.`
+      `Account (${user.email || 'unknown'}) is not authorized for Admin access.`
     );
   }
+
   await seedFirestoreIfEmpty();
   return {
     user,
@@ -248,10 +284,14 @@ export async function fetchStorefrontWithFallback(): Promise<{
   let products: Product[] = [];
 
   try {
-    const [configSnap, productsSnap] = await Promise.all([
+    const firestoreRead = Promise.all([
       getDoc(doc(db, STOREFRONT_COLLECTION, STOREFRONT_DOC_ID)),
       getDocs(query(collection(db, PRODUCTS_COLLECTION), where('active', '==', true))),
     ]);
+    const timeoutGuard = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('firestore-timeout')), 3500)
+    );
+    const [configSnap, productsSnap] = await Promise.race([firestoreRead, timeoutGuard]);
 
     if (configSnap.exists()) {
       settings = normalizeSettingsDoc(configSnap.data() as Record<string, unknown>);

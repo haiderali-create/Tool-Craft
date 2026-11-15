@@ -204,7 +204,7 @@ export function AdminDashboard({
       }
       const contentType = res.headers.get('content-type') || '';
       if (!contentType.includes('application/json')) {
-        setError('Backend dashboard API is unavailable. Please sign in with Google (Admin).');
+        setError('Backend dashboard API is unavailable. Please sign in with your Firebase Admin email.');
         return;
       }
       const data = await res.json();
@@ -1643,17 +1643,17 @@ export function AdminDashboard({
                   Firebase Cloud Admin Security
                 </h2>
                 <p className="text-xs text-[#525866] mt-0.5">
-                  Your storefront runs on Cloud Firestore and Firebase Google Authentication, so Admin logins, tools, gateways, and orders persist across Netlify, Cloudflare, and Cloud Run.
+                  Your storefront runs on Firebase Authentication &amp; Cloud Firestore, so Admin logins, tools, gateways, and orders persist across Netlify, Cloudflare, and Cloud Run.
                 </p>
               </div>
 
               <div className="p-3.5 rounded-lg bg-[#ECFDF5] border border-[#A7F3D0] space-y-1 text-xs text-[#065F46]">
-                <p className="font-semibold">Signed in with verified Google Admin account</p>
+                <p className="font-semibold">Signed in with verified Firebase Admin account</p>
                 <p className="font-mono break-all">{username || BOOTSTRAPPED_ADMIN_EMAIL}</p>
               </div>
 
               <p className="text-xs text-[#525866] leading-relaxed">
-                Password rotation is managed through your Google Account security settings rather than a local server password.
+                Password updates and user management for Cloud Admin are handled directly in your Firebase Console (Authentication → Users).
               </p>
             </div>
           ) : (
