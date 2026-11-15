@@ -1,0 +1,8 @@
+{
+  "name": "ToolCraft — AI Tools & Digital Subscriptions Store",
+  "description": "Curated AI tools and creative pro subscriptions including CapCut Pro and Gemini Pro, featuring instant WhatsApp checkout, payment gateway integration, and secure admin inventory management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

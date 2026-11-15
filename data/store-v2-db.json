@@ -1,0 +1,191 @@
+{
+  "admin": {
+    "username": "HaiderAli@10Dec",
+    "passwordHash": "d12d0c0929e9ff3095e4e811278bf887:17b5ebfe0b72cfc9dd70f0710a44edc8eb7c1253d2cdfacc0968eda24afa3c622b3928e98ae9175e6508ea6a6dbadc6a5a11b8a03576b219522106d9b95cc922",
+    "updatedAt": "2026-11-15T12:05:26.086Z"
+  },
+  "settings": {
+    "storeName": "ToolCraft",
+    "tagline": "Official AI & Creative Pro Subscriptions",
+    "whatsappNumber": "923234319689",
+    "whatsappDisplay": "+92 3234319689",
+    "currencySymbol": "Rs.",
+    "deliverySla": "Send payment screenshot on WhatsApp within 15 minutes for activation",
+    "gateways": [
+      {
+        "id": "jazzcash",
+        "label": "JazzCash",
+        "enabled": false,
+        "accountTitle": "ToolCraft Digital Store",
+        "accountNumber": "",
+        "instructions": "Send total amount to this JazzCash account, take a screenshot, upload it below, and also send it on WhatsApp within 15 minutes."
+      },
+      {
+        "id": "easypaisa",
+        "label": "Easypaisa",
+        "enabled": true,
+        "accountTitle": "Naveed Akhtar",
+        "accountNumber": "03488657017",
+        "instructions": "Transfer to Easypaisa (Naveed Akhtar · 03488657017), upload your payment screenshot below, and send it on WhatsApp within 15 minutes."
+      },
+      {
+        "id": "binance",
+        "label": "Binance (Pay ID / USDT)",
+        "enabled": true,
+        "accountTitle": "Mr Boss 1",
+        "accountNumber": "1009240724",
+        "instructions": "Send USDT via Binance Pay ID (Mr Boss 1 · 1009240724), upload the transfer screenshot below, and share it on WhatsApp within 15 minutes."
+      }
+    ],
+    "supportHours": "Support 24/7",
+    "autoFetchEndpoints": []
+  },
+  "products": [
+    {
+      "id": "capcut-pro-1m",
+      "name": "CapCut Pro",
+      "category": "Video & Editing",
+      "planLabel": "1 Month · Private Access",
+      "price": 1150,
+      "originalPrice": 2400,
+      "offerLabel": "Hot Offer",
+      "topSelling": true,
+      "inStock": true,
+      "stock": 50,
+      "logoKey": "capcut",
+      "description": "Full Pro timeline unlock with AI auto-captions, 4K 60fps export, background removal, and commercial effects.",
+      "features": [
+        "Works on PC, Mac, iOS & Android",
+        "No watermark + 4K Ultra HD exports",
+        "AI auto-captions & smart cutout tools"
+      ],
+      "active": true,
+      "createdAt": "2026-11-15T12:05:26.086Z"
+    },
+    {
+      "id": "gemini-pro-1m",
+      "name": "Gemini Pro (Google AI Premium)",
+      "category": "AI Assistants",
+      "planLabel": "1 Month · Personal Gmail Upgrade",
+      "price": 1850,
+      "originalPrice": 5600,
+      "offerLabel": "Best Value",
+      "topSelling": true,
+      "inStock": true,
+      "stock": 40,
+      "logoKey": "gemini",
+      "description": "Upgrade your own Google account with Gemini Advanced, 2TB Google One cloud storage, and Workspace AI.",
+      "features": [
+        "Activated on your personal Gmail",
+        "Includes 2TB Google Drive & Photos storage",
+        "Deep Research & priority model access"
+      ],
+      "active": true,
+      "createdAt": "2026-11-15T12:05:26.086Z"
+    },
+    {
+      "id": "canva-pro-1y",
+      "name": "Canva Pro Team Seat",
+      "category": "Design & Image",
+      "planLabel": "1 Year · Private Email Invite",
+      "price": 950,
+      "originalPrice": 3500,
+      "offerLabel": "Flash Deal",
+      "topSelling": true,
+      "inStock": true,
+      "stock": 60,
+      "logoKey": "canva",
+      "description": "Design social posts, decks, and brand kits with Magic Studio AI, background remover, and 100M+ Pro assets.",
+      "features": [
+        "Invite directly to your own email",
+        "100M+ stock photos, fonts & templates",
+        "Magic Resize & 1-click background remover"
+      ],
+      "active": true,
+      "createdAt": "2026-11-15T12:05:26.086Z"
+    },
+    {
+      "id": "elevenlabs-creator-1m",
+      "name": "ElevenLabs Creator",
+      "category": "Audio & Voice",
+      "planLabel": "1 Month · 100k Credits",
+      "price": 2950,
+      "originalPrice": 6200,
+      "topSelling": false,
+      "inStock": true,
+      "stock": 25,
+      "logoKey": "elevenlabs",
+      "description": "Studio-grade AI voiceovers, instant voice cloning, and multilingual dubbing for YouTube & faceless reels.",
+      "features": [
+        "100,000 monthly character credits",
+        "Professional voice cloning included",
+        "Commercial usage rights"
+      ],
+      "active": true,
+      "createdAt": "2026-11-15T12:05:26.086Z"
+    },
+    {
+      "id": "midjourney-pro-1m",
+      "name": "Midjourney Pro",
+      "category": "Design & Image",
+      "planLabel": "1 Month · Fast GPU Hours",
+      "price": 3100,
+      "originalPrice": 8400,
+      "offerLabel": "Studio Pick",
+      "topSelling": false,
+      "inStock": true,
+      "stock": 20,
+      "logoKey": "midjourney",
+      "description": "Photorealistic concept art, product mockups, and brand illustrations with fast generation priority.",
+      "features": [
+        "Fast GPU mode & Relax mode",
+        "Web studio + Discord workflow",
+        "Commercial license included"
+      ],
+      "active": true,
+      "createdAt": "2026-11-15T12:05:26.086Z"
+    },
+    {
+      "id": "perplexity-pro-1y",
+      "name": "Perplexity Pro",
+      "category": "Productivity",
+      "planLabel": "1 Year · Private Voucher",
+      "price": 3400,
+      "originalPrice": 12000,
+      "offerLabel": "Yearly Save",
+      "topSelling": false,
+      "inStock": true,
+      "stock": 30,
+      "logoKey": "perplexity",
+      "description": "Citation-backed AI research engine with switchable frontier models, Pro Search, and unlimited file uploads.",
+      "features": [
+        "Switch between top reasoning models",
+        "Live web citations & academic search",
+        "12-month uninterrupted access"
+      ],
+      "active": true,
+      "createdAt": "2026-11-15T12:05:26.086Z"
+    },
+    {
+      "id": "adobe-cc-1m",
+      "name": "Adobe Creative Cloud All Apps",
+      "category": "Video & Editing",
+      "planLabel": "1 Month · Genuine Email Seat",
+      "price": 3600,
+      "originalPrice": 14500,
+      "topSelling": false,
+      "inStock": true,
+      "stock": 20,
+      "logoKey": "adobe",
+      "description": "Premiere Pro, After Effects, Photoshop, and Firefly generative AI credits activated directly on your email.",
+      "features": [
+        "Official Creative Cloud desktop app",
+        "100GB cloud storage + Firefly AI",
+        "Supports Windows & macOS"
+      ],
+      "active": true,
+      "createdAt": "2026-11-15T12:05:26.086Z"
+    }
+  ],
+  "orders": []
+}
