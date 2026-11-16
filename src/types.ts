@@ -84,5 +84,6 @@ export interface PublicOrderLookup {
 
 export interface AdminAiStatus {
   serverGeminiKeyCount: number;
+  maskedKeys?: string[];
   brandPresetCount: number;
 }

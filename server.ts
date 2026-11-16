@@ -14,11 +14,13 @@ import {
   signSessionToken,
   verifyPassword,
 } from './server/auth.ts';
+import { verifyFirebaseAdminBearer } from './server/firebaseAdminVerify.ts';
 import { generateOrderCode, readDb, writeDb } from './server/storeDb.ts';
 import {
   buildLogoCandidateUrls,
   buildWhatsappOrderUrl,
   formatCurrency,
+  maskApiKey,
   normalizeDomainInput,
   parseApiEndpointLines,
   parseKeyList,
@@ -504,8 +506,38 @@ async function startServer() {
     ].filter((key, idx, arr) => arr.indexOf(key) === idx);
   }
 
+  async function requireAdminOrFirebase(
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction
+  ) {
+    if (getSessionFromRequest(req)) {
+      next();
+      return;
+    }
+    const firebaseEmail = await verifyFirebaseAdminBearer(
+      req.headers.authorization,
+      process.env.FIREBASE_WEB_API_KEY || process.env.VITE_FIREBASE_API_KEY,
+      process.env.ADMIN_EMAIL || process.env.VITE_ADMIN_EMAIL
+    );
+    if (firebaseEmail) {
+      next();
+      return;
+    }
+    res.status(401).json({ error: 'Admin authentication required.' });
+  }
+
+  app.get('/api/admin/ai-status', requireAdminOrFirebase, (_req, res) => {
+    const keys = getServerGeminiKeys();
+    res.json({
+      serverGeminiKeyCount: keys.length,
+      maskedKeys: keys.map(maskApiKey),
+      brandPresetCount: Object.keys(BRAND_PRESETS).length,
+    });
+  });
+
   // Server-side Auto-Fetch Official Tool Logo & Info with Multi-API Sequential Failover
-  app.post('/api/admin/auto-tool-info', requireAdmin, async (req, res) => {
+  app.post('/api/admin/auto-tool-info', requireAdminOrFirebase, async (req, res) => {
     const body = (req.body || {}) as {
       name?: string;
       domain?: string;
@@ -613,7 +645,10 @@ async function startServer() {
     for (let i = 0; i < geminiKeys.length; i += 1) {
       const apiKey = geminiKeys[i];
       try {
-        const ai = new GoogleGenAI({ apiKey });
+        const ai = new GoogleGenAI({
+          apiKey,
+          httpOptions: { headers: { 'User-Agent': 'aistudio-build' } },
+        });
         const response = await ai.models.generateContent({
           model: 'gemini-2.5-flash',
           contents: `Provide concise storefront product details for the digital subscription tool named "${rawName}". Choose the closest category from: ${PRODUCT_CATEGORIES.join(', ')}. Include the official website domain (e.g. runwayml.com) so we can fetch its logo.`,
@@ -690,13 +725,15 @@ async function startServer() {
 
   app.get('/api/admin/dashboard', requireAdmin, (_req, res) => {
     const db = readDb();
+    const keys = getServerGeminiKeys();
     res.json({
       username: db.admin.username,
       settings: db.settings,
       products: db.products,
       orders: db.orders,
       aiStatus: {
-        serverGeminiKeyCount: getServerGeminiKeys().length,
+        serverGeminiKeyCount: keys.length,
+        maskedKeys: keys.map(maskApiKey),
         brandPresetCount: Object.keys(BRAND_PRESETS).length,
       },
     });

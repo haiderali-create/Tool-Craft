@@ -322,6 +322,15 @@ export function parseKeyList(raw: string | undefined): string[] {
   return result;
 }
 
+export function maskApiKey(key: string): string {
+  const trimmed = key.trim();
+  if (!trimmed) return '';
+  if (trimmed.length <= 10) {
+    return `${trimmed.slice(0, 3)}••••${trimmed.slice(-2)}`;
+  }
+  return `${trimmed.slice(0, 6)}••••••${trimmed.slice(-4)}`;
+}
+
 export function normalizeDomainInput(raw: string): string {
   const cleaned = raw
     .trim()

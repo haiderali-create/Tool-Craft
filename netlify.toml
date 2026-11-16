@@ -1,6 +1,17 @@
 [build]
   command = "npm run build"
   publish = "dist"
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/api/admin/ai-status"
+  to = "/.netlify/functions/ai-status"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/auto-tool-info"
+  to = "/.netlify/functions/auto-tool-info"
+  status = 200
 
 [[redirects]]
   from = "/*"

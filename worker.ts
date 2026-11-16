@@ -3,10 +3,12 @@ import {
   createDefaultProducts,
   createDefaultSettings,
 } from './src/data/defaultStoreSeed.ts';
+import { verifyFirebaseAdminBearer } from './server/firebaseAdminVerify.ts';
 import {
   buildLogoCandidateUrls,
   buildWhatsappOrderUrl,
   formatCurrency,
+  maskApiKey,
   normalizeDomainInput,
   parseApiEndpointLines,
   parseKeyList,
@@ -43,6 +45,8 @@ export interface Env {
   SESSION_SECRET?: string;
   GEMINI_API_KEY?: string;
   GEMINI_API_KEYS?: string;
+  FIREBASE_WEB_API_KEY?: string;
+  ADMIN_EMAIL?: string;
 }
 
 interface WorkerAdminCredentials {
@@ -529,19 +533,41 @@ export default {
 
     // All remaining /api/admin/* endpoints require authentication
     const session = await getSessionFromRequest(request, env);
-    if (!session) {
+    const firebaseAllowedRoute =
+      pathname === '/api/admin/ai-status' || pathname === '/api/admin/auto-tool-info';
+    const firebaseAdminEmail =
+      !session && firebaseAllowedRoute
+        ? await verifyFirebaseAdminBearer(
+            request.headers.get('authorization'),
+            env.FIREBASE_WEB_API_KEY,
+            env.ADMIN_EMAIL
+          )
+        : null;
+
+    if (!session && !firebaseAdminEmail) {
       return jsonResponse({ error: 'Admin authentication required.' }, 401);
+    }
+
+    if (pathname === '/api/admin/ai-status' && request.method === 'GET') {
+      const keys = getServerGeminiKeys(env);
+      return jsonResponse({
+        serverGeminiKeyCount: keys.length,
+        maskedKeys: keys.map(maskApiKey),
+        brandPresetCount: Object.keys(BRAND_PRESETS).length,
+      });
     }
 
     if (pathname === '/api/admin/dashboard' && request.method === 'GET') {
       const db = await loadDb(env);
+      const keys = getServerGeminiKeys(env);
       return jsonResponse({
         username: db.admin.username,
         settings: db.settings,
         products: db.products,
         orders: db.orders,
         aiStatus: {
-          serverGeminiKeyCount: getServerGeminiKeys(env).length,
+          serverGeminiKeyCount: keys.length,
+          maskedKeys: keys.map(maskApiKey),
           brandPresetCount: Object.keys(BRAND_PRESETS).length,
         },
       });
@@ -654,7 +680,10 @@ export default {
             )}`,
             {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'aistudio-build',
+              },
               body: JSON.stringify({
                 contents: [
                   {

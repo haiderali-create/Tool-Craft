@@ -10,6 +10,7 @@ import {
   LogOut,
   Package,
   Plus,
+  RefreshCw,
   Search,
   Server,
   Shield,
@@ -19,6 +20,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import { auth } from '../firebase';
 import type {
   AdminAiStatus,
   GatewayId,
@@ -46,7 +48,6 @@ import {
   filterAndSortProducts,
   formatAutoFetchSourceLabel,
   formatCurrency,
-  parseApiEndpointLines,
   PRODUCT_CATEGORIES,
   resolveBrandKeyFromName,
   validateProductInput,
@@ -134,15 +135,14 @@ export function AdminDashboard({
   const [previewOrder, setPreviewOrder] = useState<Order | null>(null);
 
   const [settingsDraft, setSettingsDraft] = useState<StoreSettings | null>(null);
-  const [endpointsText, setEndpointsText] = useState('');
   const [aiStatus, setAiStatus] = useState<AdminAiStatus>({
     serverGeminiKeyCount: 0,
+    maskedKeys: [],
     brandPresetCount: 17,
   });
   const [toolApiPanelOpen, setToolApiPanelOpen] = useState(false);
   const [toolGatewayPanelOpen, setToolGatewayPanelOpen] = useState(false);
-  const [newApiUrl, setNewApiUrl] = useState('');
-  const [savingEndpoints, setSavingEndpoints] = useState(false);
+  const [refreshingAiStatus, setRefreshingAiStatus] = useState(false);
   const [autoFetchSource, setAutoFetchSource] = useState('');
   const [savingSettings, setSavingSettings] = useState(false);
 
@@ -175,21 +175,77 @@ export function AdminDashboard({
     });
   };
 
+  const buildProxyHeaders = async (extraHeaders: Record<string, string> = {}) => {
+    const headers = new Headers(extraHeaders);
+    if (authMode === 'firebase' && auth.currentUser) {
+      try {
+        const idToken = await auth.currentUser.getIdToken();
+        if (idToken) {
+          headers.set('Authorization', `Bearer ${idToken}`);
+        }
+      } catch {
+        // Ignore token refresh errors; server will fall back to session cookie if present
+      }
+    } else if (authToken) {
+      headers.set('Authorization', `Bearer ${authToken}`);
+    }
+    return headers;
+  };
+
+  const fetchAiStatus = async (): Promise<AdminAiStatus | null> => {
+    try {
+      const headers = await buildProxyHeaders();
+      const res = await fetch('/api/admin/ai-status', {
+        cache: 'no-store',
+        credentials: 'include',
+        headers,
+      });
+      const contentType = res.headers.get('content-type') || '';
+      if (!res.ok || !contentType.includes('application/json')) return null;
+      const data = (await res.json()) as AdminAiStatus;
+      if (typeof data.serverGeminiKeyCount === 'number') {
+        const normalized: AdminAiStatus = {
+          serverGeminiKeyCount: data.serverGeminiKeyCount,
+          maskedKeys: Array.isArray(data.maskedKeys) ? data.maskedKeys : [],
+          brandPresetCount: typeof data.brandPresetCount === 'number' ? data.brandPresetCount : 17,
+        };
+        setAiStatus(normalized);
+        return normalized;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
+  const handleRefreshAiStatus = async () => {
+    setRefreshingAiStatus(true);
+    try {
+      const status = await fetchAiStatus();
+      if (status) {
+        showToast(
+          status.serverGeminiKeyCount === 1
+            ? '1 Gemini API key active & live'
+            : `${status.serverGeminiKeyCount} Gemini API keys active & live`
+        );
+      } else {
+        showToast('Unable to reach server Gemini proxy');
+      }
+    } finally {
+      setRefreshingAiStatus(false);
+    }
+  };
+
   const loadDashboard = async () => {
     setLoading(true);
     setError('');
     try {
       if (authMode === 'firebase') {
-        const data = await fetchAdminDashboardFirestore();
+        const [data] = await Promise.all([fetchAdminDashboardFirestore(), fetchAiStatus()]);
         setProducts(data.products);
         setOrders(data.orders);
         setSettings(data.settings);
         setSettingsDraft(data.settings);
-        setEndpointsText(
-          Array.isArray(data.settings.autoFetchEndpoints)
-            ? data.settings.autoFetchEndpoints.join('\n')
-            : ''
-        );
         setNewUsername(data.username || username);
         return;
       }
@@ -213,13 +269,12 @@ export function AdminDashboard({
       setOrders(data.orders || []);
       setSettings(data.settings);
       setSettingsDraft(data.settings);
-      setEndpointsText(
-        Array.isArray(data.settings?.autoFetchEndpoints)
-          ? data.settings.autoFetchEndpoints.join('\n')
-          : ''
-      );
       if (data.aiStatus) {
-        setAiStatus(data.aiStatus);
+        setAiStatus({
+          serverGeminiKeyCount: Number(data.aiStatus.serverGeminiKeyCount) || 0,
+          maskedKeys: Array.isArray(data.aiStatus.maskedKeys) ? data.aiStatus.maskedKeys : [],
+          brandPresetCount: Number(data.aiStatus.brandPresetCount) || 17,
+        });
       }
       setNewUsername(data.username || username);
     } catch (err) {
@@ -293,29 +348,28 @@ export function AdminDashboard({
         source?: string;
       } | null = null;
 
-      if (authMode === 'server') {
-        try {
-          const res = await adminFetch('/api/admin/auto-tool-info', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name: cleanName,
-              endpoints: endpointsText,
-            }),
-          });
-          const contentType = res.headers.get('content-type') || '';
-          if (res.ok && contentType.includes('application/json')) {
-            data = await res.json();
-          }
-        } catch {
-          // Fall back to client lookup below
+      try {
+        const headers = await buildProxyHeaders({ 'Content-Type': 'application/json' });
+        const res = await fetch('/api/admin/auto-tool-info', {
+          method: 'POST',
+          cache: 'no-store',
+          credentials: 'include',
+          headers,
+          body: JSON.stringify({
+            name: cleanName,
+          }),
+        });
+        const contentType = res.headers.get('content-type') || '';
+        if (res.ok && contentType.includes('application/json')) {
+          data = await res.json();
         }
+      } catch {
+        // Fall back to deterministic brand + domain lookup below
       }
 
       if (!data) {
         data = await autoFetchToolInfoClientFallback({
           name: cleanName,
-          endpointsText,
         });
       }
 
@@ -653,112 +707,17 @@ export function AdminDashboard({
     }
   };
 
-  const saveEndpointsList = async (nextList: string[], successMessage: string) => {
-    setSavingEndpoints(true);
-    setError('');
-    setFormError('');
-    try {
-      const normalized = parseApiEndpointLines(nextList.join('\n'));
-      if (authMode === 'firebase') {
-        const updatedSettings = await updateSettingsFirestore({ autoFetchEndpoints: normalized });
-        setSettings(updatedSettings);
-        setSettingsDraft(updatedSettings);
-        setEndpointsText(
-          Array.isArray(updatedSettings.autoFetchEndpoints)
-            ? updatedSettings.autoFetchEndpoints.join('\n')
-            : ''
-        );
-        showToast(successMessage);
-        return true;
-      }
-
-      const res = await adminFetch('/api/admin/settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ autoFetchEndpoints: normalized }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Failed to update API list.');
-        return false;
-      }
-      setSettings(data.settings);
-      setSettingsDraft(data.settings);
-      setEndpointsText(
-        Array.isArray(data.settings?.autoFetchEndpoints)
-          ? data.settings.autoFetchEndpoints.join('\n')
-          : ''
-      );
-      showToast(successMessage);
-      return true;
-    } catch (err) {
-      setError(err instanceof Error && err.message ? err.message : 'Network error updating API list.');
-      return false;
-    } finally {
-      setSavingEndpoints(false);
-    }
-  };
-
-  const handleAddApiEndpoint = async () => {
-    const rawLines = newApiUrl
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter((line) => line && !line.startsWith('#'));
-
-    if (rawLines.length === 0) {
-      setError('Enter at least one API URL (1 per line, starting with https:// or http://).');
-      return;
-    }
-
-    const invalidLine = rawLines.find((line) => !/^https?:\/\/\S+$/i.test(line));
-    if (invalidLine) {
-      setError(`Invalid API URL: "${invalidLine}". Each line must start with https:// or http://`);
-      return;
-    }
-
-    const existing = parseApiEndpointLines(endpointsText);
-    const merged = parseApiEndpointLines([...existing, ...rawLines].join('\n'));
-    const addedCount = merged.length - existing.length;
-    if (addedCount === 0) {
-      setError('All entered API URLs are already in your live list.');
-      return;
-    }
-
-    const ok = await saveEndpointsList(
-      merged,
-      addedCount === 1 ? '1 API added & live' : `${addedCount} APIs added & live`
-    );
-    if (ok) {
-      setNewApiUrl('');
-    }
-  };
-
-  const handleDeleteApiEndpoint = async (indexToRemove: number) => {
-    const existing = parseApiEndpointLines(endpointsText);
-    const nextList = existing.filter((_, idx) => idx !== indexToRemove);
-    await saveEndpointsList(nextList, 'API deleted');
-  };
-
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!settingsDraft) return;
     setSavingSettings(true);
     setError('');
     try {
-      const parsedEndpoints = parseApiEndpointLines(endpointsText);
       if (authMode === 'firebase') {
-        const updatedSettings = await updateSettingsFirestore({
-          ...settingsDraft,
-          autoFetchEndpoints: parsedEndpoints,
-        });
+        const updatedSettings = await updateSettingsFirestore(settingsDraft);
         setSettings(updatedSettings);
         setSettingsDraft(updatedSettings);
-        setEndpointsText(
-          Array.isArray(updatedSettings.autoFetchEndpoints)
-            ? updatedSettings.autoFetchEndpoints.join('\n')
-            : ''
-        );
-        showToast('Settings, WhatsApp & Lookup APIs saved live');
+        showToast('Settings & payment gateways saved live');
         await Promise.resolve(onStoreDataChanged());
         return;
       }
@@ -766,10 +725,7 @@ export function AdminDashboard({
       const res = await adminFetch('/api/admin/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...settingsDraft,
-          autoFetchEndpoints: parsedEndpoints,
-        }),
+        body: JSON.stringify(settingsDraft),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -778,12 +734,7 @@ export function AdminDashboard({
       }
       setSettings(data.settings);
       setSettingsDraft(data.settings);
-      setEndpointsText(
-        Array.isArray(data.settings?.autoFetchEndpoints)
-          ? data.settings.autoFetchEndpoints.join('\n')
-          : ''
-      );
-      showToast('Settings, WhatsApp & Lookup APIs saved live');
+      showToast('Settings & payment gateways saved live');
       await Promise.resolve(onStoreDataChanged());
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : 'Network error saving settings.');
@@ -1048,9 +999,7 @@ export function AdminDashboard({
                     }`}
                   >
                     <Server className="w-3.5 h-3.5" />
-                    APIs (
-                    {parseApiEndpointLines(endpointsText).length + aiStatus.serverGeminiKeyCount}{' '}
-                    Live)
+                    Gemini API ({aiStatus.serverGeminiKeyCount} Live)
                   </button>
 
                   <button
@@ -1109,100 +1058,71 @@ export function AdminDashboard({
 
               {toolApiPanelOpen && (
                 <div className="p-4 sm:p-5 bg-[#F4F5F7] border-b border-[#E2E5EA] space-y-3">
-                  {/* Live Count Banner Above API Controls */}
+                  {/* Live Gemini Keys Banner */}
                   <div className="p-3 rounded-xl bg-[#ECFDF5] border border-[#A7F3D0] flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#059669] shrink-0" />
+                      <span
+                        className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                          aiStatus.serverGeminiKeyCount > 0 ? 'bg-[#059669]' : 'bg-[#D97706]'
+                        }`}
+                      />
                       <span
                         data-testid="live-api-count"
                         className="text-sm font-bold text-[#065F46]"
                       >
-                        Live:{' '}
-                        {parseApiEndpointLines(endpointsText).length + aiStatus.serverGeminiKeyCount}{' '}
-                        API
-                        {parseApiEndpointLines(endpointsText).length +
-                          aiStatus.serverGeminiKeyCount ===
-                        1
-                          ? ''
-                          : 's'}{' '}
-                        Running
+                        Live: {aiStatus.serverGeminiKeyCount} Gemini Key
+                        {aiStatus.serverGeminiKeyCount === 1 ? '' : 's'} Running
                       </span>
                     </div>
-                    <span className="text-xs font-mono text-[#047857]">
-                      {parseApiEndpointLines(endpointsText).length} Added API(s) ·{' '}
-                      {aiStatus.serverGeminiKeyCount} Server Secret Key(s)
-                    </span>
-                  </div>
-
-                  {/* Add APIs (1 per line) */}
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="toolbar-add-apis"
-                      className="block text-xs font-medium text-[#525866]"
-                    >
-                      Add Lookup APIs (1 URL per line — auto-failover in order)
-                    </label>
-                    <textarea
-                      id="toolbar-add-apis"
-                      rows={3}
-                      aria-label="Add lookup APIs one per line"
-                      value={newApiUrl}
-                      onChange={(e) => setNewApiUrl(e.target.value)}
-                      placeholder={
-                        'https://primary-tool-api.example.com/lookup?q={name}\nhttps://backup-tool-api.example.com/lookup?q={name}'
-                      }
-                      className="w-full px-3 py-2 text-xs font-mono bg-white border border-[#E2E5EA] rounded-lg focus:outline-none focus:border-[#0D0F12]"
-                    />
-                    <div className="flex justify-end">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-xs font-mono text-[#047857]">
+                        {aiStatus.brandPresetCount} Built-in Brands Active
+                      </span>
                       <button
                         type="button"
-                        disabled={savingEndpoints}
-                        onClick={handleAddApiEndpoint}
-                        className="inline-flex items-center justify-center gap-1.5 min-h-[38px] px-4 py-1.5 text-xs font-semibold text-white bg-[#0D0F12] rounded-lg hover:bg-[#059669] cursor-pointer whitespace-nowrap"
+                        disabled={refreshingAiStatus}
+                        onClick={handleRefreshAiStatus}
+                        className="inline-flex items-center gap-1 min-h-[32px] px-2.5 py-1 text-xs font-semibold text-[#065F46] bg-white border border-[#A7F3D0] rounded-lg hover:bg-[#D1FAE5]/40 cursor-pointer shrink-0"
                       >
-                        <Plus className="w-3.5 h-3.5" />
-                        {savingEndpoints ? 'Saving...' : 'Add API(s)'}
+                        <RefreshCw
+                          className={`w-3.5 h-3.5 ${refreshingAiStatus ? 'animate-spin' : ''}`}
+                        />
+                        {refreshingAiStatus ? 'Checking...' : 'Refresh'}
                       </button>
                     </div>
                   </div>
 
-                  {/* Added APIs List with Individual Delete Button */}
-                  {parseApiEndpointLines(endpointsText).length === 0 ? (
-                    <p className="text-xs text-[#525866]">
-                      No custom lookup APIs added yet. Server-side Gemini keys are configured via
-                      environment secrets ({aiStatus.serverGeminiKeyCount} live).
-                    </p>
-                  ) : (
+                  {/* Masked Active Server Keys */}
+                  {aiStatus.maskedKeys && aiStatus.maskedKeys.length > 0 && (
                     <div className="space-y-2">
-                      {parseApiEndpointLines(endpointsText).map((apiUrl, idx) => (
+                      {aiStatus.maskedKeys.map((maskedKey, idx) => (
                         <div
-                          key={apiUrl}
+                          key={`${maskedKey}-${idx}`}
                           className="p-2.5 bg-white border border-[#E2E5EA] rounded-lg flex items-center justify-between gap-3"
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
                             <span className="text-[11px] font-mono font-bold text-[#525866] bg-[#F4F5F7] px-2 py-0.5 rounded shrink-0">
                               #{idx + 1}
                             </span>
-                            <span className="text-xs font-mono text-[#0D0F12] truncate">
-                              {apiUrl}
+                            <span className="text-xs font-mono font-semibold text-[#0D0F12] truncate">
+                              {maskedKey}
                             </span>
                             <span className="text-[11px] font-semibold text-[#059669] bg-[#ECFDF5] border border-[#A7F3D0] px-1.5 py-0.5 rounded shrink-0">
                               Live
                             </span>
                           </div>
-                          <button
-                            type="button"
-                            disabled={savingEndpoints}
-                            onClick={() => handleDeleteApiEndpoint(idx)}
-                            aria-label={`Delete API #${idx + 1}`}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#DC2626] bg-[#FEF2F2] border border-[#FECACA] rounded-lg hover:bg-[#FEE2E2] cursor-pointer shrink-0"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            Delete
-                          </button>
+                          <span className="text-[11px] text-[#525866] shrink-0">
+                            Server Secret
+                          </span>
                         </div>
                       ))}
                     </div>
+                  )}
+
+                  {(!aiStatus.maskedKeys || aiStatus.maskedKeys.length === 0) && (
+                    <p className="text-xs text-[#525866]">
+                      No server Gemini key configured yet.
+                    </p>
                   )}
                 </div>
               )}
@@ -1539,10 +1459,10 @@ export function AdminDashboard({
             >
               <div>
                 <h2 className="font-display text-lg font-bold text-[#0D0F12]">
-                  WhatsApp, Gateways &amp; Auto-Fetch Lookup APIs
+                  WhatsApp &amp; Payment Gateways
                 </h2>
                 <p className="text-xs text-[#525866] mt-0.5">
-                  Update your WhatsApp number, support badge, payment gateways, and multi-line auto-fetch fallback endpoints.
+                  Update your WhatsApp number, support badge, and active payment accounts.
                 </p>
               </div>
 
@@ -1632,94 +1552,6 @@ export function AdminDashboard({
                     placeholder="Support 24/7"
                     className="w-full min-h-[42px] px-3 py-2 text-sm border border-[#E2E5EA] rounded-lg"
                   />
-                </div>
-              </div>
-
-              {/* Added Lookup APIs with Live Counter & Delete */}
-              <div className="pt-4 border-t border-[#E2E5EA] space-y-3">
-                <div className="p-3 rounded-xl bg-[#ECFDF5] border border-[#A7F3D0] flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#059669] shrink-0" />
-                    <span className="text-sm font-bold text-[#065F46]">
-                      Live:{' '}
-                      {parseApiEndpointLines(endpointsText).length + aiStatus.serverGeminiKeyCount}{' '}
-                      API
-                      {parseApiEndpointLines(endpointsText).length +
-                        aiStatus.serverGeminiKeyCount ===
-                      1
-                        ? ''
-                        : 's'}{' '}
-                      Running
-                    </span>
-                  </div>
-                  <span className="text-xs font-mono text-[#047857]">
-                    {parseApiEndpointLines(endpointsText).length} Added API(s) ·{' '}
-                    {aiStatus.serverGeminiKeyCount} Server Secret Key(s)
-                  </span>
-                </div>
-
-                {parseApiEndpointLines(endpointsText).length > 0 && (
-                  <div className="space-y-2">
-                    {parseApiEndpointLines(endpointsText).map((apiUrl, idx) => (
-                      <div
-                        key={apiUrl}
-                        className="p-2.5 bg-[#F4F5F7] border border-[#E2E5EA] rounded-lg flex items-center justify-between gap-3"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <span className="text-[11px] font-mono font-bold text-[#525866] bg-white px-2 py-0.5 rounded shrink-0">
-                            #{idx + 1}
-                          </span>
-                          <span className="text-xs font-mono text-[#0D0F12] truncate">
-                            {apiUrl}
-                          </span>
-                          <span className="text-[11px] font-semibold text-[#059669] bg-[#ECFDF5] border border-[#A7F3D0] px-1.5 py-0.5 rounded shrink-0">
-                            Live
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          disabled={savingEndpoints}
-                          onClick={() => handleDeleteApiEndpoint(idx)}
-                          aria-label={`Delete settings API #${idx + 1}`}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#DC2626] bg-white border border-[#FECACA] rounded-lg hover:bg-[#FEF2F2] cursor-pointer shrink-0"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          Delete
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <label
-                    htmlFor="set-api-endpoints"
-                    className="block text-xs font-medium text-[#525866]"
-                  >
-                    Add Lookup APIs (1 URL per line — auto-failover in order)
-                  </label>
-                  <textarea
-                    id="set-api-endpoints"
-                    rows={3}
-                    aria-label="Add lookup API endpoints one per line"
-                    value={newApiUrl}
-                    onChange={(e) => setNewApiUrl(e.target.value)}
-                    placeholder={
-                      'https://primary-tool-api.example.com/lookup?q={name}\nhttps://backup-tool-api.example.com/lookup?q={name}'
-                    }
-                    className="w-full px-3 py-2 text-xs font-mono bg-[#F4F5F7] border border-[#E2E5EA] rounded-lg focus:outline-none focus:border-[#0D0F12]"
-                  />
-                  <div className="flex justify-end">
-                    <button
-                      type="button"
-                      disabled={savingEndpoints}
-                      onClick={handleAddApiEndpoint}
-                      className="inline-flex items-center justify-center gap-1.5 min-h-[38px] px-4 py-1.5 text-xs font-semibold text-white bg-[#0D0F12] rounded-lg hover:bg-[#059669] cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      Add API(s)
-                    </button>
-                  </div>
                 </div>
               </div>
 

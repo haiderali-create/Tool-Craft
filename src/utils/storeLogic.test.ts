@@ -10,6 +10,7 @@ import {
   formatCurrency,
   formatEnabledGatewayNames,
   formatUsdtAmount,
+  maskApiKey,
   normalizeDomainInput,
   parseApiEndpointLines,
   parseKeyList,
@@ -225,6 +226,10 @@ test('parseApiEndpointLines, parseKeyList, normalizeDomainInput, and formatAutoF
 
   const keys = parseKeyList('keyA,\nkeyB\nMY_GEMINI_API_KEY\nkeyA');
   assert.deepEqual(keys, ['keyA', 'keyB']);
+
+  assert.equal(maskApiKey('AIzaSyDHz0lwtJHti1PGG6tFdKkSb'), 'AIzaSy••••••KkSb');
+  assert.equal(maskApiKey('shortkey'), 'sho••••ey');
+  assert.equal(maskApiKey('   '), '');
 
   assert.equal(normalizeDomainInput('https://www.runwayml.com/studio?x=1'), 'runwayml.com');
   assert.equal(normalizeDomainInput('invalid domain'), '');
