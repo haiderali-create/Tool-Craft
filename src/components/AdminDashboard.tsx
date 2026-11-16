@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react';
 import {
   ArrowLeft,
   Check,
-  ChevronDown,
-  ChevronUp,
   CreditCard,
   Edit3,
   Eye,
@@ -143,9 +141,8 @@ export function AdminDashboard({
   });
   const [toolApiPanelOpen, setToolApiPanelOpen] = useState(false);
   const [toolGatewayPanelOpen, setToolGatewayPanelOpen] = useState(false);
-  const [modalApiPanelOpen, setModalApiPanelOpen] = useState(false);
+  const [newApiUrl, setNewApiUrl] = useState('');
   const [savingEndpoints, setSavingEndpoints] = useState(false);
-  const [toolDomain, setToolDomain] = useState('');
   const [autoFetchSource, setAutoFetchSource] = useState('');
   const [savingSettings, setSavingSettings] = useState(false);
 
@@ -247,7 +244,6 @@ export function AdminDashboard({
 
   const openAddProduct = () => {
     setFormState(EMPTY_FORM);
-    setToolDomain('');
     setAutoFetchSource('');
     setFormError('');
     setEditorOpen(true);
@@ -272,7 +268,6 @@ export function AdminDashboard({
       featuredInHero: product.featuredInHero !== false,
       active: product.active,
     });
-    setToolDomain('');
     setAutoFetchSource('');
     setFormError('');
     setEditorOpen(true);
@@ -305,7 +300,6 @@ export function AdminDashboard({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               name: cleanName,
-              domain: toolDomain.trim() || undefined,
               endpoints: endpointsText,
             }),
           });
@@ -321,7 +315,6 @@ export function AdminDashboard({
       if (!data) {
         data = await autoFetchToolInfoClientFallback({
           name: cleanName,
-          domain: toolDomain.trim() || undefined,
           endpointsText,
         });
       }
@@ -660,14 +653,14 @@ export function AdminDashboard({
     }
   };
 
-  const handleSaveEndpointsOnly = async () => {
+  const saveEndpointsList = async (nextList: string[], successMessage: string) => {
     setSavingEndpoints(true);
     setError('');
     setFormError('');
     try {
-      const parsedEndpoints = parseApiEndpointLines(endpointsText);
+      const normalized = parseApiEndpointLines(nextList.join('\n'));
       if (authMode === 'firebase') {
-        const updatedSettings = await updateSettingsFirestore({ autoFetchEndpoints: parsedEndpoints });
+        const updatedSettings = await updateSettingsFirestore({ autoFetchEndpoints: normalized });
         setSettings(updatedSettings);
         setSettingsDraft(updatedSettings);
         setEndpointsText(
@@ -675,19 +668,19 @@ export function AdminDashboard({
             ? updatedSettings.autoFetchEndpoints.join('\n')
             : ''
         );
-        showToast(`Saved ${parsedEndpoints.length} lookup API line(s)`);
-        return;
+        showToast(successMessage);
+        return true;
       }
 
       const res = await adminFetch('/api/admin/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ autoFetchEndpoints: parsedEndpoints }),
+        body: JSON.stringify({ autoFetchEndpoints: normalized }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || 'Failed to save lookup APIs.');
-        return;
+        setError(data.error || 'Failed to update API list.');
+        return false;
       }
       setSettings(data.settings);
       setSettingsDraft(data.settings);
@@ -696,12 +689,54 @@ export function AdminDashboard({
           ? data.settings.autoFetchEndpoints.join('\n')
           : ''
       );
-      showToast(`Saved ${parsedEndpoints.length} lookup API line(s)`);
+      showToast(successMessage);
+      return true;
     } catch (err) {
-      setError(err instanceof Error && err.message ? err.message : 'Network error saving lookup APIs.');
+      setError(err instanceof Error && err.message ? err.message : 'Network error updating API list.');
+      return false;
     } finally {
       setSavingEndpoints(false);
     }
+  };
+
+  const handleAddApiEndpoint = async () => {
+    const rawLines = newApiUrl
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('#'));
+
+    if (rawLines.length === 0) {
+      setError('Enter at least one API URL (1 per line, starting with https:// or http://).');
+      return;
+    }
+
+    const invalidLine = rawLines.find((line) => !/^https?:\/\/\S+$/i.test(line));
+    if (invalidLine) {
+      setError(`Invalid API URL: "${invalidLine}". Each line must start with https:// or http://`);
+      return;
+    }
+
+    const existing = parseApiEndpointLines(endpointsText);
+    const merged = parseApiEndpointLines([...existing, ...rawLines].join('\n'));
+    const addedCount = merged.length - existing.length;
+    if (addedCount === 0) {
+      setError('All entered API URLs are already in your live list.');
+      return;
+    }
+
+    const ok = await saveEndpointsList(
+      merged,
+      addedCount === 1 ? '1 API added & live' : `${addedCount} APIs added & live`
+    );
+    if (ok) {
+      setNewApiUrl('');
+    }
+  };
+
+  const handleDeleteApiEndpoint = async (indexToRemove: number) => {
+    const existing = parseApiEndpointLines(endpointsText);
+    const nextList = existing.filter((_, idx) => idx !== indexToRemove);
+    await saveEndpointsList(nextList, 'API deleted');
   };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -1013,7 +1048,9 @@ export function AdminDashboard({
                     }`}
                   >
                     <Server className="w-3.5 h-3.5" />
-                    Gemini &amp; APIs ({aiStatus.serverGeminiKeyCount})
+                    APIs (
+                    {parseApiEndpointLines(endpointsText).length + aiStatus.serverGeminiKeyCount}{' '}
+                    Live)
                   </button>
 
                   <button
@@ -1072,47 +1109,101 @@ export function AdminDashboard({
 
               {toolApiPanelOpen && (
                 <div className="p-4 sm:p-5 bg-[#F4F5F7] border-b border-[#E2E5EA] space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div>
-                      <h3 className="text-sm font-semibold text-[#0D0F12]">
-                        Gemini API &amp; Auto-Fetch Failover Chain
-                      </h3>
-                      <p className="text-xs text-[#525866]">
-                        Gemini API keys are loaded securely from AI Studio Secrets (
-                        <code className="font-mono bg-white px-1 rounded">GEMINI_API_KEY</code> /{' '}
-                        <code className="font-mono bg-white px-1 rounded">GEMINI_API_KEYS</code>).
-                        Optional 1-URL-per-line lookup endpoints below also auto-failover if needed.
-                      </p>
+                  {/* Live Count Banner Above API Controls */}
+                  <div className="p-3 rounded-xl bg-[#ECFDF5] border border-[#A7F3D0] flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#059669] shrink-0" />
+                      <span
+                        data-testid="live-api-count"
+                        className="text-sm font-bold text-[#065F46]"
+                      >
+                        Live:{' '}
+                        {parseApiEndpointLines(endpointsText).length + aiStatus.serverGeminiKeyCount}{' '}
+                        API
+                        {parseApiEndpointLines(endpointsText).length +
+                          aiStatus.serverGeminiKeyCount ===
+                        1
+                          ? ''
+                          : 's'}{' '}
+                        Running
+                      </span>
                     </div>
-                    <div className="text-xs font-mono text-[#065F46] bg-[#ECFDF5] border border-[#A7F3D0] px-2.5 py-1.5 rounded-lg shrink-0">
-                      Gemini Keys Active: {aiStatus.serverGeminiKeyCount}
-                    </div>
+                    <span className="text-xs font-mono text-[#047857]">
+                      {parseApiEndpointLines(endpointsText).length} Added API(s) ·{' '}
+                      {aiStatus.serverGeminiKeyCount} Server Secret Key(s)
+                    </span>
                   </div>
 
-                  <textarea
-                    rows={3}
-                    aria-label="Tool auto-fetch lookup API URLs"
-                    value={endpointsText}
-                    onChange={(e) => setEndpointsText(e.target.value)}
-                    placeholder={'Optional extra JSON URLs (1 per line)\nhttps://primary-tool-api.example.com/lookup?q={name}'}
-                    className="w-full px-3 py-2 text-xs font-mono bg-white border border-[#E2E5EA] rounded-lg focus:outline-none focus:border-[#0D0F12]"
-                  />
-
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-[11px] text-[#525866]">
-                      Add multiple Gemini keys in AI Studio Secrets under{' '}
-                      <code className="font-mono bg-white px-1 rounded">GEMINI_API_KEYS</code> for
-                      automatic Gemini failover.
-                    </p>
-                    <button
-                      type="button"
-                      disabled={savingEndpoints}
-                      onClick={handleSaveEndpointsOnly}
-                      className="min-h-[38px] px-4 py-1.5 text-xs font-semibold text-white bg-[#0D0F12] rounded-lg hover:bg-[#059669] cursor-pointer"
+                  {/* Add APIs (1 per line) */}
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="toolbar-add-apis"
+                      className="block text-xs font-medium text-[#525866]"
                     >
-                      {savingEndpoints ? 'Saving APIs...' : 'Save Lookup APIs'}
-                    </button>
+                      Add Lookup APIs (1 URL per line — auto-failover in order)
+                    </label>
+                    <textarea
+                      id="toolbar-add-apis"
+                      rows={3}
+                      aria-label="Add lookup APIs one per line"
+                      value={newApiUrl}
+                      onChange={(e) => setNewApiUrl(e.target.value)}
+                      placeholder={
+                        'https://primary-tool-api.example.com/lookup?q={name}\nhttps://backup-tool-api.example.com/lookup?q={name}'
+                      }
+                      className="w-full px-3 py-2 text-xs font-mono bg-white border border-[#E2E5EA] rounded-lg focus:outline-none focus:border-[#0D0F12]"
+                    />
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        disabled={savingEndpoints}
+                        onClick={handleAddApiEndpoint}
+                        className="inline-flex items-center justify-center gap-1.5 min-h-[38px] px-4 py-1.5 text-xs font-semibold text-white bg-[#0D0F12] rounded-lg hover:bg-[#059669] cursor-pointer whitespace-nowrap"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        {savingEndpoints ? 'Saving...' : 'Add API(s)'}
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Added APIs List with Individual Delete Button */}
+                  {parseApiEndpointLines(endpointsText).length === 0 ? (
+                    <p className="text-xs text-[#525866]">
+                      No custom lookup APIs added yet. Server-side Gemini keys are configured via
+                      environment secrets ({aiStatus.serverGeminiKeyCount} live).
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {parseApiEndpointLines(endpointsText).map((apiUrl, idx) => (
+                        <div
+                          key={apiUrl}
+                          className="p-2.5 bg-white border border-[#E2E5EA] rounded-lg flex items-center justify-between gap-3"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="text-[11px] font-mono font-bold text-[#525866] bg-[#F4F5F7] px-2 py-0.5 rounded shrink-0">
+                              #{idx + 1}
+                            </span>
+                            <span className="text-xs font-mono text-[#0D0F12] truncate">
+                              {apiUrl}
+                            </span>
+                            <span className="text-[11px] font-semibold text-[#059669] bg-[#ECFDF5] border border-[#A7F3D0] px-1.5 py-0.5 rounded shrink-0">
+                              Live
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={savingEndpoints}
+                            onClick={() => handleDeleteApiEndpoint(idx)}
+                            aria-label={`Delete API #${idx + 1}`}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#DC2626] bg-[#FEF2F2] border border-[#FECACA] rounded-lg hover:bg-[#FEE2E2] cursor-pointer shrink-0"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Delete
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1544,29 +1635,92 @@ export function AdminDashboard({
                 </div>
               </div>
 
-              {/* Per-line Lookup API Endpoints with Auto-Failover */}
-              <div className="pt-4 border-t border-[#E2E5EA] space-y-2">
-                <label
-                  htmlFor="set-api-endpoints"
-                  className="block text-sm font-semibold text-[#0D0F12]"
-                >
-                  Auto-Fetch Lookup API Endpoints (1 URL per line — Auto-Fallback)
-                </label>
-                <p className="text-xs text-[#525866]">
-                  Add one JSON endpoint URL per line (optional{' '}
-                  <code className="font-mono bg-[#F4F5F7] px-1 rounded">{'{name}'}</code>{' '}
-                  placeholder). If API line 1 does not respond, the server automatically tries line
-                  2, then built-in brands and server-side{' '}
-                  <code className="font-mono bg-[#F4F5F7] px-1 rounded">GEMINI_API_KEYS</code>.
-                </p>
-                <textarea
-                  id="set-api-endpoints"
-                  rows={4}
-                  value={endpointsText}
-                  onChange={(e) => setEndpointsText(e.target.value)}
-                  placeholder={'https://primary-tool-api.example.com/lookup?q={name}\nhttps://backup-tool-api.example.com/lookup?q={name}'}
-                  className="w-full px-3 py-2 text-xs font-mono bg-[#F4F5F7] border border-[#E2E5EA] rounded-lg focus:outline-none focus:border-[#0D0F12]"
-                />
+              {/* Added Lookup APIs with Live Counter & Delete */}
+              <div className="pt-4 border-t border-[#E2E5EA] space-y-3">
+                <div className="p-3 rounded-xl bg-[#ECFDF5] border border-[#A7F3D0] flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#059669] shrink-0" />
+                    <span className="text-sm font-bold text-[#065F46]">
+                      Live:{' '}
+                      {parseApiEndpointLines(endpointsText).length + aiStatus.serverGeminiKeyCount}{' '}
+                      API
+                      {parseApiEndpointLines(endpointsText).length +
+                        aiStatus.serverGeminiKeyCount ===
+                      1
+                        ? ''
+                        : 's'}{' '}
+                      Running
+                    </span>
+                  </div>
+                  <span className="text-xs font-mono text-[#047857]">
+                    {parseApiEndpointLines(endpointsText).length} Added API(s) ·{' '}
+                    {aiStatus.serverGeminiKeyCount} Server Secret Key(s)
+                  </span>
+                </div>
+
+                {parseApiEndpointLines(endpointsText).length > 0 && (
+                  <div className="space-y-2">
+                    {parseApiEndpointLines(endpointsText).map((apiUrl, idx) => (
+                      <div
+                        key={apiUrl}
+                        className="p-2.5 bg-[#F4F5F7] border border-[#E2E5EA] rounded-lg flex items-center justify-between gap-3"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="text-[11px] font-mono font-bold text-[#525866] bg-white px-2 py-0.5 rounded shrink-0">
+                            #{idx + 1}
+                          </span>
+                          <span className="text-xs font-mono text-[#0D0F12] truncate">
+                            {apiUrl}
+                          </span>
+                          <span className="text-[11px] font-semibold text-[#059669] bg-[#ECFDF5] border border-[#A7F3D0] px-1.5 py-0.5 rounded shrink-0">
+                            Live
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={savingEndpoints}
+                          onClick={() => handleDeleteApiEndpoint(idx)}
+                          aria-label={`Delete settings API #${idx + 1}`}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#DC2626] bg-white border border-[#FECACA] rounded-lg hover:bg-[#FEF2F2] cursor-pointer shrink-0"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Delete
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <label
+                    htmlFor="set-api-endpoints"
+                    className="block text-xs font-medium text-[#525866]"
+                  >
+                    Add Lookup APIs (1 URL per line — auto-failover in order)
+                  </label>
+                  <textarea
+                    id="set-api-endpoints"
+                    rows={3}
+                    aria-label="Add lookup API endpoints one per line"
+                    value={newApiUrl}
+                    onChange={(e) => setNewApiUrl(e.target.value)}
+                    placeholder={
+                      'https://primary-tool-api.example.com/lookup?q={name}\nhttps://backup-tool-api.example.com/lookup?q={name}'
+                    }
+                    className="w-full px-3 py-2 text-xs font-mono bg-[#F4F5F7] border border-[#E2E5EA] rounded-lg focus:outline-none focus:border-[#0D0F12]"
+                  />
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      disabled={savingEndpoints}
+                      onClick={handleAddApiEndpoint}
+                      className="inline-flex items-center justify-center gap-1.5 min-h-[38px] px-4 py-1.5 text-xs font-semibold text-white bg-[#0D0F12] rounded-lg hover:bg-[#059669] cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Add API(s)
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div className="pt-4 border-t border-[#E2E5EA] space-y-4">
@@ -1845,89 +1999,11 @@ export function AdminDashboard({
                   </div>
                 </div>
 
-                {/* Inside-Tool API & Domain Auto-Fetch Failover Controls */}
-                <div className="pt-2 border-t border-[#E2E5EA] space-y-2">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <button
-                      type="button"
-                      aria-expanded={modalApiPanelOpen}
-                      onClick={() => setModalApiPanelOpen((prev) => !prev)}
-                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#0D0F12] hover:text-[#059669] cursor-pointer"
-                    >
-                      <Server className="w-3.5 h-3.5" />
-                      <span>
-                        Tool Lookup APIs &amp; Domain ({parseApiEndpointLines(endpointsText).length} API
-                        {parseApiEndpointLines(endpointsText).length === 1 ? '' : 's'} ·{' '}
-                        {aiStatus.serverGeminiKeyCount} Server AI Key
-                        {aiStatus.serverGeminiKeyCount === 1 ? '' : 's'})
-                      </span>
-                      {modalApiPanelOpen ? (
-                        <ChevronUp className="w-3.5 h-3.5" />
-                      ) : (
-                        <ChevronDown className="w-3.5 h-3.5" />
-                      )}
-                    </button>
-
-                    {autoFetchSource && (
-                      <span className="text-[11px] font-medium text-[#065F46] bg-[#ECFDF5] border border-[#A7F3D0] px-2 py-0.5 rounded">
-                        Resolved via: {autoFetchSource}
-                      </span>
-                    )}
-                  </div>
-
-                  {modalApiPanelOpen && (
-                    <div className="p-3 bg-white border border-[#E2E5EA] rounded-lg space-y-2.5">
-                      <div>
-                        <label
-                          htmlFor="prod-domain"
-                          className="block text-[11px] font-medium text-[#525866] mb-1"
-                        >
-                          Official Tool Domain (optional — fetches real logo directly)
-                        </label>
-                        <input
-                          id="prod-domain"
-                          type="text"
-                          value={toolDomain}
-                          onChange={(e) => setToolDomain(e.target.value)}
-                          placeholder="e.g. runwayml.com, suno.com, klingai.com"
-                          className="w-full min-h-[36px] px-2.5 py-1.5 text-xs font-mono border border-[#E2E5EA] rounded-md"
-                        />
-                      </div>
-
-                      <div>
-                        <label
-                          htmlFor="prod-api-lines"
-                          className="block text-[11px] font-medium text-[#525866] mb-1"
-                        >
-                          Lookup API URLs (1 URL per line — tries next API automatically on failure)
-                        </label>
-                        <textarea
-                          id="prod-api-lines"
-                          rows={3}
-                          value={endpointsText}
-                          onChange={(e) => setEndpointsText(e.target.value)}
-                          placeholder={'https://primary-api.example.com/tool?q={name}\nhttps://backup-api.example.com/tool?q={name}'}
-                          className="w-full px-2.5 py-1.5 text-xs font-mono bg-[#F4F5F7] border border-[#E2E5EA] rounded-md"
-                        />
-                      </div>
-
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="text-[11px] text-[#525866]">
-                          Server Secrets ({aiStatus.serverGeminiKeyCount} Gemini key
-                          {aiStatus.serverGeminiKeyCount === 1 ? '' : 's'} active)
-                        </span>
-                        <button
-                          type="button"
-                          disabled={savingEndpoints}
-                          onClick={handleSaveEndpointsOnly}
-                          className="min-h-[32px] px-3 py-1 text-xs font-semibold text-white bg-[#0D0F12] rounded-md hover:bg-[#059669] cursor-pointer"
-                        >
-                          {savingEndpoints ? 'Saving...' : 'Save APIs'}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                {autoFetchSource && (
+                  <p className="text-[11px] font-medium text-[#065F46]">
+                    Resolved via: {autoFetchSource}
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
