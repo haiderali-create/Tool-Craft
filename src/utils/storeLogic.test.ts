@@ -9,6 +9,7 @@ import {
   formatAutoFetchSourceLabel,
   formatCurrency,
   formatEnabledGatewayNames,
+  formatUsdtAmount,
   normalizeDomainInput,
   parseApiEndpointLines,
   parseKeyList,
@@ -98,8 +99,10 @@ test('resolveBrandKeyFromName matches official AI and creative tools', () => {
   assert.equal(resolveBrandKeyFromName('Unknown Custom App'), 'generic');
 });
 
-test('formatCurrency and sanitizeWhatsappPhone handle values cleanly', () => {
+test('formatCurrency, formatUsdtAmount, and sanitizeWhatsappPhone handle values cleanly', () => {
   assert.equal(formatCurrency(1850, 'Rs.'), 'Rs. 1,850');
+  assert.equal(formatUsdtAmount(950), '3.33 USDT');
+  assert.equal(formatUsdtAmount(285), '1.00 USDT');
   assert.equal(sanitizeWhatsappPhone('+92 323-4319689'), '923234319689');
 });
 

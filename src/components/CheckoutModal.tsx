@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  AlertCircle,
   Check,
   CheckCircle2,
   Copy,
@@ -8,6 +7,7 @@ import {
   ExternalLink,
   ImagePlus,
   MessageCircle,
+  Share2,
   Trash2,
   X,
 } from 'lucide-react';
@@ -64,6 +64,56 @@ async function readImageFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
+async function dataUrlToPngBlobAndFile(
+  dataUrl: string,
+  filename: string
+): Promise<{ blob: Blob; file: File } | null> {
+  if (!dataUrl) return null;
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width || 600;
+      canvas.height = img.height || 600;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(null);
+        return;
+      }
+      ctx.drawImage(img, 0, 0);
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          resolve(null);
+          return;
+        }
+        const safeName = filename.replace(/\.[^.]+$/, '') || 'payment-screenshot';
+        const file = new File([blob], `${safeName}.png`, { type: 'image/png' });
+        resolve({ blob, file });
+      }, 'image/png');
+    };
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
+}
+
+async function copyScreenshotImageToClipboard(dataUrl: string): Promise<boolean> {
+  try {
+    if (
+      typeof ClipboardItem === 'undefined' ||
+      !navigator.clipboard ||
+      typeof navigator.clipboard.write !== 'function'
+    ) {
+      return false;
+    }
+    const result = await dataUrlToPngBlobAndFile(dataUrl, 'payment-screenshot');
+    if (!result) return false;
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': result.blob })]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps) {
   const enabledGateways = resolveCheckoutGateways(settings.gateways, product.allowedGateways);
   const [selectedGatewayId, setSelectedGatewayId] = useState<GatewayId>(
@@ -77,17 +127,22 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
   const [screenshotName, setScreenshotName] = useState('');
   const [copiedPhone, setCopiedPhone] = useState(false);
   const [copiedAccount, setCopiedAccount] = useState(false);
+  const [copiedScreenshot, setCopiedScreenshot] = useState(false);
+  const [canShareScreenshot, setCanShareScreenshot] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [confirmedOrder, setConfirmedOrder] = useState<{
     order: Order;
     whatsappUrl: string;
+    whatsappMessage: string;
   } | null>(null);
 
   const activeGateway =
     enabledGateways.find((g) => g.id === selectedGatewayId) || enabledGateways[0];
 
   const priceText = formatCurrency(product.price, settings.currencySymbol);
+  const isBinance = activeGateway?.id === 'binance';
+
   const directWhatsappUrl = buildWhatsappOrderUrl({
     storeWhatsapp: settings.whatsappNumber,
     productName: product.name,
@@ -112,6 +167,34 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
       setTimeout(() => setCopiedAccount(false), 2000);
     } catch {
       // Ignore clipboard failure
+    }
+  };
+
+  const handleCopyScreenshot = async () => {
+    const ok = await copyScreenshotImageToClipboard(screenshotDataUrl);
+    if (ok) {
+      setCopiedScreenshot(true);
+      setTimeout(() => setCopiedScreenshot(false), 3000);
+    }
+  };
+
+  const handleNativeShareWithImage = async () => {
+    if (!confirmedOrder) return;
+    try {
+      const converted = await dataUrlToPngBlobAndFile(
+        screenshotDataUrl,
+        `payment-${confirmedOrder.order.orderCode}`
+      );
+      if (converted && navigator.share && navigator.canShare?.({ files: [converted.file] })) {
+        await navigator.share({
+          title: `Order ${confirmedOrder.order.orderCode}`,
+          text: confirmedOrder.whatsappMessage,
+          files: [converted.file],
+        });
+        return;
+      }
+    } catch {
+      // User dismissed share or share unavailable
     }
   };
 
@@ -147,7 +230,7 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
     });
 
     if (!check.valid) {
-      setError(check.error || 'Please complete all required fields and upload your screenshot.');
+      setError(check.error || 'Please fill in your details and attach a screenshot.');
       return;
     }
 
@@ -166,9 +249,36 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
         screenshotDataUrl,
       });
 
+      const copied = await copyScreenshotImageToClipboard(screenshotDataUrl);
+      setCopiedScreenshot(copied);
+
+      const converted = await dataUrlToPngBlobAndFile(
+        screenshotDataUrl,
+        `payment-${result.order.orderCode}`
+      );
+      const supportsFileShare = Boolean(
+        converted &&
+          typeof navigator.share === 'function' &&
+          typeof navigator.canShare === 'function' &&
+          navigator.canShare({ files: [converted.file] })
+      );
+      setCanShareScreenshot(supportsFileShare);
+
+      const whatsappMessage = [
+        `Assalam o Alaikum! Order *${result.order.orderCode}*`,
+        `Tool: ${result.order.productName} (${result.order.planLabel})`,
+        `Amount: ${formatCurrency(result.order.amount, result.order.currencySymbol)}`,
+        `Method: ${result.order.paymentMethodLabel}`,
+        `Name: ${result.order.customerName}`,
+        result.order.transactionRef ? `Ref: ${result.order.transactionRef}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n');
+
       setConfirmedOrder({
         order: result.order,
         whatsappUrl: result.whatsappUrl,
+        whatsappMessage,
       });
     } catch (err) {
       const msg =
@@ -190,7 +300,7 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
       aria-modal="true"
       aria-labelledby="checkout-modal-title"
     >
-      <div className="w-full sm:max-w-2xl max-h-[94vh] overflow-y-auto bg-white rounded-t-2xl sm:rounded-xl border border-[#E2E5EA] shadow-2xl">
+      <div className="w-full sm:max-w-xl max-h-[94vh] overflow-y-auto bg-white rounded-t-2xl sm:rounded-xl border border-[#E2E5EA] shadow-2xl">
         {/* Header */}
         <div className="sticky top-0 z-10 bg-white border-b border-[#E2E5EA] px-5 py-3.5 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
@@ -205,10 +315,11 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
                 id="checkout-modal-title"
                 className="font-display text-base sm:text-lg font-bold text-[#0D0F12] truncate"
               >
-                {confirmedOrder ? 'Order Submitted' : `Buy ${product.name}`}
+                {confirmedOrder ? 'Order Confirmed' : `Buy ${product.name}`}
               </h2>
               <p className="text-xs text-[#525866] truncate">
-                {product.planLabel} · <span className="font-mono font-semibold text-[#0D0F12]">{priceText}</span>
+                {product.planLabel} ·{' '}
+                <span className="font-mono font-semibold text-[#0D0F12]">{priceText}</span>
               </p>
             </div>
           </div>
@@ -217,48 +328,48 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
             type="button"
             onClick={onClose}
             aria-label="Close checkout"
-            className="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-[#E2E5EA] text-[#525866] hover:text-[#0D0F12] hover:bg-[#F4F5F7] cursor-pointer shrink-0"
+            className="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-[#E2E5EA] text-[#525866] hover:text-[#0D0F12] hover:bg-[#F4F5F7] cursor-pointer shrink-0"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         <div className="p-4 sm:p-5 space-y-4">
-          {/* WhatsApp Number Banner */}
-          <div className="p-3.5 rounded-xl bg-[#ECFDF5] border border-[#A7F3D0] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-[#065F46]">
-                WhatsApp Number for Payment Screenshot
-              </p>
-              <p
-                data-testid="checkout-whatsapp-number"
-                className="mt-0.5 font-mono tabular-nums text-base sm:text-lg font-bold text-[#064E3B]"
-              >
-                {settings.whatsappDisplay}
-              </p>
-              <p className="text-xs text-[#047857]">
-                Send payment screenshot on this WhatsApp within 15 minutes after submitting.
-              </p>
+          {/* Compact WhatsApp Bar */}
+          <div className="px-3.5 py-2.5 rounded-xl bg-[#ECFDF5] border border-[#A7F3D0] flex flex-wrap items-center justify-between gap-2.5">
+            <div className="min-w-0 flex items-center gap-2.5">
+              <MessageCircle className="w-4 h-4 text-[#059669] shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium text-[#047857] leading-tight">
+                  WhatsApp Support
+                </p>
+                <p
+                  data-testid="checkout-whatsapp-number"
+                  className="font-mono tabular-nums text-sm sm:text-base font-bold text-[#064E3B] leading-tight"
+                >
+                  {settings.whatsappDisplay}
+                </p>
+              </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
                 onClick={handleCopyPhone}
-                className="inline-flex items-center gap-1.5 min-h-[40px] px-3 py-2 text-xs font-semibold text-[#065F46] bg-white border border-[#A7F3D0] rounded-lg hover:bg-[#F0FDF4] cursor-pointer whitespace-nowrap"
+                className="inline-flex items-center gap-1.5 min-h-[36px] px-3 py-1.5 text-xs font-semibold text-[#065F46] bg-white border border-[#A7F3D0] rounded-lg hover:bg-[#F0FDF4] cursor-pointer whitespace-nowrap"
               >
                 {copiedPhone ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                {copiedPhone ? 'Copied' : 'Copy Number'}
+                {copiedPhone ? 'Copied' : 'Copy'}
               </button>
 
               <a
                 href={confirmedOrder ? confirmedOrder.whatsappUrl : directWhatsappUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 min-h-[40px] px-4 py-2 text-xs font-semibold text-white bg-[#059669] rounded-lg hover:bg-[#047857] whitespace-nowrap"
+                className="inline-flex items-center gap-1.5 min-h-[36px] px-3.5 py-1.5 text-xs font-semibold text-white bg-[#059669] rounded-lg hover:bg-[#047857] whitespace-nowrap"
               >
                 <MessageCircle className="w-3.5 h-3.5" />
-                Open WhatsApp
+                WhatsApp
                 <ExternalLink className="w-3 h-3" />
               </a>
             </div>
@@ -270,7 +381,9 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
                 <div className="flex items-center gap-2 text-[#059669]">
                   <CheckCircle2 className="w-5 h-5" />
                   <span className="text-sm font-semibold">
-                    Order saved — send screenshot on WhatsApp within 15 minutes
+                    {copiedScreenshot
+                      ? 'Order saved & screenshot copied — paste (Ctrl+V) in WhatsApp!'
+                      : 'Order saved — send screenshot on WhatsApp'}
                   </span>
                 </div>
 
@@ -294,59 +407,88 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
                     </span>
                   </div>
                   <div>
-                    <span className="block text-xs text-[#525866]">Gateway</span>
+                    <span className="block text-xs text-[#525866]">Method</span>
                     <span className="font-medium text-[#0D0F12]">
                       {confirmedOrder.order.paymentMethodLabel}
                     </span>
                   </div>
-                  <div>
-                    <span className="block text-xs text-[#525866]">Screenshot</span>
-                    <span className="font-medium text-[#059669]">Attached</span>
+                  <div className="flex items-center gap-2.5">
+                    {screenshotDataUrl && (
+                      <img
+                        src={screenshotDataUrl}
+                        alt="Attached payment screenshot"
+                        className="w-10 h-10 object-cover rounded-lg border border-[#A7F3D0] shrink-0"
+                      />
+                    )}
+                    <div className="min-w-0">
+                      <span className="block text-xs text-[#525866]">Screenshot</span>
+                      <span className="font-medium text-[#059669] truncate block">
+                        {copiedScreenshot ? 'Copied (Ctrl+V)' : 'Attached'}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="p-3 rounded-lg bg-[#FFFBEB] border border-[#FDE68A] text-xs text-[#92400E] flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>
-                  Important: Click the green button below and send your payment screenshot to{' '}
-                  <strong className="font-mono">{settings.whatsappDisplay}</strong> within{' '}
-                  <strong>15 minutes</strong> to receive your login / activation.
-                </span>
-              </div>
+              <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2.5">
+                {canShareScreenshot && (
+                  <button
+                    type="button"
+                    onClick={handleNativeShareWithImage}
+                    className="flex-1 inline-flex items-center justify-center gap-2 min-h-[44px] px-4 py-2.5 text-sm font-semibold text-white bg-[#059669] rounded-lg hover:bg-[#047857] cursor-pointer"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    Share Screenshot + Message to WhatsApp
+                  </button>
+                )}
 
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                 <a
                   href={confirmedOrder.whatsappUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 inline-flex items-center justify-center gap-2 min-h-[44px] px-5 py-3 text-sm font-semibold text-white bg-[#059669] rounded-lg hover:bg-[#047857]"
+                  className={`flex-1 inline-flex items-center justify-center gap-2 min-h-[44px] px-4 py-2.5 text-sm font-semibold rounded-lg ${
+                    canShareScreenshot
+                      ? 'bg-[#0D0F12] text-white hover:bg-[#272A30]'
+                      : 'bg-[#059669] text-white hover:bg-[#047857]'
+                  }`}
                 >
                   <MessageCircle className="w-4 h-4" />
-                  Send Screenshot on WhatsApp Now
+                  Open WhatsApp Chat
                 </a>
+
                 <button
                   type="button"
-                  onClick={onClose}
-                  className="min-h-[44px] px-5 py-3 text-sm font-medium text-[#0D0F12] bg-[#F4F5F7] border border-[#E2E5EA] rounded-lg hover:bg-[#E2E5EA] cursor-pointer"
+                  onClick={handleCopyScreenshot}
+                  className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3.5 py-2.5 text-xs font-semibold text-[#0D0F12] bg-[#F4F5F7] border border-[#E2E5EA] rounded-lg hover:bg-[#E2E5EA] cursor-pointer"
                 >
-                  Back to Store
+                  {copiedScreenshot ? (
+                    <Check className="w-3.5 h-3.5 text-[#059669]" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5" />
+                  )}
+                  {copiedScreenshot ? 'Screenshot Copied' : 'Copy Screenshot'}
                 </button>
               </div>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* 1. Payment Gateway Selector (JazzCash, Easypaisa, Binance) */}
-              <div>
-                <p className="text-sm font-semibold text-[#0D0F12] mb-2">
-                  1. Choose Payment Method &amp; Send {priceText}
-                </p>
+              {/* 1. Payment Method + Send To Card */}
+              <div className="space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-[#0D0F12]">
+                    1. Send Payment
+                  </p>
+                  <div className="inline-flex items-center font-mono text-xs font-bold bg-[#F4F5F7] border border-[#E2E5EA] px-2.5 py-1 rounded-md text-[#0D0F12]">
+                    {priceText}
+                  </div>
+                </div>
+
                 <div
                   className={`grid gap-2 ${
                     enabledGateways.length === 1
                       ? 'grid-cols-1'
                       : enabledGateways.length === 2
-                        ? 'grid-cols-1 sm:grid-cols-2'
+                        ? 'grid-cols-2'
                         : 'grid-cols-1 sm:grid-cols-3'
                   }`}
                 >
@@ -358,9 +500,10 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
                         type="button"
                         onClick={() => {
                           setSelectedGatewayId(gw.id);
+                          setCopiedAccount(false);
                           setError('');
                         }}
-                        className={`text-left px-3.5 py-2.5 rounded-lg border text-xs font-semibold transition-colors cursor-pointer min-h-[44px] flex items-center gap-2 ${
+                        className={`text-left px-3 py-2.5 rounded-lg border text-xs font-semibold transition-colors cursor-pointer min-h-[42px] flex items-center gap-2 ${
                           selected
                             ? 'bg-[#0D0F12] text-white border-[#0D0F12]'
                             : 'bg-white text-[#0D0F12] border-[#E2E5EA] hover:border-[#8A92A0]'
@@ -374,50 +517,47 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
                 </div>
 
                 {activeGateway && (
-                  <div className="mt-2.5 p-3.5 rounded-lg bg-[#F4F5F7] border border-[#E2E5EA] space-y-2">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 space-y-1">
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                          <span className="text-[11px] font-medium text-[#525866]">
-                            {activeGateway.id === 'binance' ? 'Account Name:' : 'Account Title:'}
-                          </span>
-                          <span className="text-xs font-bold text-[#0D0F12]">
-                            {activeGateway.accountTitle}
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                          <span className="text-[11px] font-medium text-[#525866]">
-                            {activeGateway.id === 'binance' ? 'Binance Pay ID:' : 'Account Number:'}
-                          </span>
-                          <span className="font-mono text-sm font-bold text-[#0D0F12] break-all">
-                            {activeGateway.accountNumber}
-                          </span>
-                        </div>
+                  <div className="p-3.5 rounded-xl bg-[#F8F9FA] border border-[#E2E5EA] space-y-2.5">
+                    <div className="min-w-0">
+                      <span className="block text-[11px] font-medium text-[#525866]">
+                        Name
+                      </span>
+                      <span className="text-sm font-bold text-[#0D0F12] block truncate">
+                        {activeGateway.accountTitle}
+                      </span>
+                    </div>
+
+                    <div className="pt-2 border-t border-[#E2E5EA] flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <span className="block text-[11px] font-medium text-[#525866]">
+                          {isBinance ? 'Binance Pay ID' : 'Account Number'}
+                        </span>
+                        <span className="font-mono text-base font-bold text-[#0D0F12] tracking-tight break-all">
+                          {activeGateway.accountNumber}
+                        </span>
                       </div>
+
                       <button
                         type="button"
                         onClick={() => handleCopyAccount(activeGateway.accountNumber)}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-white border border-[#E2E5EA] rounded-md text-[#0D0F12] hover:bg-[#F8F9FA] cursor-pointer shrink-0"
+                        className="inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-2 text-xs font-semibold bg-white border border-[#E2E5EA] rounded-lg text-[#0D0F12] hover:bg-[#F4F5F7] cursor-pointer shrink-0"
                       >
                         {copiedAccount ? (
-                          <Check className="w-3 h-3 text-[#059669]" />
+                          <Check className="w-3.5 h-3.5 text-[#059669]" />
                         ) : (
-                          <Copy className="w-3 h-3" />
+                          <Copy className="w-3.5 h-3.5" />
                         )}
-                        {copiedAccount ? 'Copied' : 'Copy'}
+                        {copiedAccount ? 'Copied' : 'Copy Number'}
                       </button>
                     </div>
-                    <p className="text-xs text-[#525866] leading-relaxed">
-                      {activeGateway.instructions}
-                    </p>
                   </div>
                 )}
               </div>
 
-              {/* 2. Customer Info & Payment Screenshot Upload */}
+              {/* 2. Customer Info & Screenshot */}
               <div className="space-y-3">
                 <p className="text-sm font-semibold text-[#0D0F12]">
-                  2. Enter Your Details &amp; Attach Payment Screenshot
+                  2. Your Details &amp; Screenshot
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -426,7 +566,7 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
                       htmlFor="checkout-name"
                       className="block text-xs font-medium text-[#525866] mb-1"
                     >
-                      Your Full Name *
+                      Your Name *
                     </label>
                     <input
                       id="checkout-name"
@@ -434,7 +574,7 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
                       required
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
-                      placeholder="e.g. Hamza Raza"
+                      placeholder="Your full name"
                       className="w-full min-h-[42px] px-3 py-2 text-sm bg-white border border-[#E2E5EA] rounded-lg text-[#0D0F12] focus:outline-none focus:border-[#0D0F12]"
                     />
                   </div>
@@ -444,7 +584,7 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
                       htmlFor="checkout-whatsapp"
                       className="block text-xs font-medium text-[#525866] mb-1"
                     >
-                      Your WhatsApp Number *
+                      Your WhatsApp *
                     </label>
                     <input
                       id="checkout-whatsapp"
@@ -462,7 +602,7 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
                       htmlFor="checkout-email"
                       className="block text-xs font-medium text-[#525866] mb-1"
                     >
-                      Activation Gmail (optional)
+                      Gmail (optional)
                     </label>
                     <input
                       id="checkout-email"
@@ -479,7 +619,7 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
                       htmlFor="checkout-txref"
                       className="block text-xs font-medium text-[#525866] mb-1"
                     >
-                      TID / Reference Number (optional)
+                      TID / Ref (optional)
                     </label>
                     <input
                       id="checkout-txref"
@@ -492,22 +632,21 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
                   </div>
                 </div>
 
-                {/* Mandatory Payment Screenshot Upload */}
                 <div>
                   <label
                     htmlFor="checkout-screenshot"
                     className="block text-xs font-semibold text-[#0D0F12] mb-1.5"
                   >
-                    Upload Payment Screenshot * (Required to enable Submit)
+                    Payment Screenshot *
                   </label>
 
                   {!screenshotDataUrl ? (
                     <label
                       htmlFor="checkout-screenshot"
-                      className="flex items-center justify-center gap-2.5 w-full min-h-[76px] p-4 rounded-xl border-2 border-dashed border-[#CBD2D9] bg-[#F4F5F7] hover:border-[#0D0F12] transition-colors cursor-pointer text-sm text-[#525866]"
+                      className="flex items-center justify-center gap-2 w-full min-h-[64px] p-3.5 rounded-xl border-2 border-dashed border-[#CBD2D9] bg-[#F4F5F7] hover:border-[#0D0F12] transition-colors cursor-pointer text-xs sm:text-sm text-[#525866]"
                     >
-                      <ImagePlus className="w-5 h-5 text-[#0D0F12]" />
-                      <span>Click to attach payment screenshot (JPG, PNG)</span>
+                      <ImagePlus className="w-4 h-4 text-[#0D0F12]" />
+                      <span>Upload Payment Screenshot (JPG, PNG)</span>
                       <input
                         id="checkout-screenshot"
                         type="file"
@@ -522,15 +661,13 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
                         <img
                           src={screenshotDataUrl}
                           alt="Uploaded payment screenshot preview"
-                          className="w-14 h-14 object-cover rounded-lg border border-[#A7F3D0] shrink-0"
+                          className="w-12 h-12 object-cover rounded-lg border border-[#A7F3D0] shrink-0"
                         />
                         <div className="min-w-0">
                           <p className="text-xs font-semibold text-[#065F46] truncate">
-                            {screenshotName || 'Payment screenshot attached'}
+                            {screenshotName || 'Screenshot attached'}
                           </p>
-                          <p className="text-[11px] text-[#047857]">
-                            Ready — Submit button unlocked
-                          </p>
+                          <p className="text-[11px] text-[#047857]">Ready to submit</p>
                         </div>
                       </div>
 
@@ -563,16 +700,16 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
               <div className="pt-2 border-t border-[#E2E5EA] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
                 <p className="text-xs text-[#525866]">
                   {screenshotDataUrl
-                    ? 'Screenshot attached. Must also be sent on WhatsApp within 15 min.'
-                    : 'Attach payment screenshot above to unlock Submit.'}
+                    ? 'Ready — click button to submit & send on WhatsApp.'
+                    : 'Attach screenshot to enable Submit.'}
                 </p>
 
                 <button
                   type="submit"
                   disabled={!canSubmit}
-                  className={`inline-flex items-center justify-center gap-2 min-h-[44px] px-6 py-3 text-sm font-semibold rounded-lg whitespace-nowrap ${
+                  className={`inline-flex items-center justify-center gap-2 min-h-[44px] px-5 py-2.5 text-sm font-semibold rounded-lg whitespace-nowrap ${
                     canSubmit
-                      ? 'bg-[#0D0F12] text-white hover:bg-[#059669] cursor-pointer'
+                      ? 'bg-[#059669] text-white hover:bg-[#047857] cursor-pointer'
                       : 'bg-[#E2E5EA] text-[#8A92A0] cursor-not-allowed'
                   }`}
                 >

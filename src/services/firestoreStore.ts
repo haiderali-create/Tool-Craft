@@ -227,7 +227,12 @@ export async function signInAdminWithEmailPassword(
   email: string,
   password: string
 ): Promise<{ user: User; username: string }> {
-  const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
+  const cleanEmail = email.trim().toLowerCase();
+  if (cleanEmail !== BOOTSTRAPPED_ADMIN_EMAIL) {
+    throw new Error('Access denied. Only the authorized Admin email can sign in.');
+  }
+
+  const credential = await signInWithEmailAndPassword(auth, cleanEmail, password);
   const user = credential.user;
 
   if (!user.emailVerified) {

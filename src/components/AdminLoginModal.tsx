@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { Eye, EyeOff, X } from 'lucide-react';
-import { signInAdminWithEmailPassword } from '../services/firestoreStore';
+import {
+  BOOTSTRAPPED_ADMIN_EMAIL,
+  signInAdminWithEmailPassword,
+} from '../services/firestoreStore';
 import { StoreBrandLogo } from './StoreBrandLogo';
 
 export type AdminAuthMode = 'firebase' | 'server';
@@ -22,8 +25,13 @@ export function AdminLoginModal({ open, onClose, onSuccess }: AdminLoginModalPro
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const identifier = username.trim();
+    const identifier = username.trim().toLowerCase();
     if (!identifier || !password) return;
+
+    if (identifier !== BOOTSTRAPPED_ADMIN_EMAIL) {
+      setError('Access denied. Only the authorized Admin email can sign in.');
+      return;
+    }
 
     setLoading(true);
     setError('');
@@ -46,18 +54,9 @@ export function AdminLoginModal({ open, onClose, onSuccess }: AdminLoginModalPro
             onSuccess(data.username, data.token, 'server');
             return;
           }
-          if (!identifier.includes('@')) {
-            setError(data.error || 'Authentication failed.');
-            return;
-          }
         }
       } catch {
         // Static hosts (Netlify / GitHub Pages) have no server endpoint; fall back to Firebase
-      }
-
-      if (!identifier.includes('@')) {
-        setError('Please enter your Admin Email and Password.');
-        return;
       }
 
       const result = await signInAdminWithEmailPassword(identifier, password);
@@ -66,7 +65,11 @@ export function AdminLoginModal({ open, onClose, onSuccess }: AdminLoginModalPro
       onSuccess(result.username, undefined, 'firebase');
     } catch (err) {
       const raw = err instanceof Error ? err.message : '';
-      if (raw.includes('auth/operation-not-allowed')) {
+      if (raw.includes('auth/configuration-not-found')) {
+        setError(
+          'Firebase Authentication is not enabled yet for this project. Open Firebase Console → Authentication → click "Get started" → enable Email/Password & add your Admin user.'
+        );
+      } else if (raw.includes('auth/operation-not-allowed')) {
         setError(
           'Enable Email/Password sign-in in Firebase Console (Authentication → Sign-in method).'
         );
@@ -117,11 +120,11 @@ export function AdminLoginModal({ open, onClose, onSuccess }: AdminLoginModalPro
               htmlFor="admin-username"
               className="block text-xs font-medium text-[#525866] mb-1.5"
             >
-              Username or Admin Email
+              Admin Email
             </label>
             <input
               id="admin-username"
-              type="text"
+              type="email"
               required
               autoComplete="username"
               autoCapitalize="none"
@@ -129,7 +132,7 @@ export function AdminLoginModal({ open, onClose, onSuccess }: AdminLoginModalPro
               spellCheck={false}
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter username or admin email"
+              placeholder="Enter authorized admin email"
               className="w-full min-h-[44px] px-3.5 py-2.5 text-sm bg-[#F8F9FA] border border-[#E4E6EB] rounded-lg text-[#111214] focus:outline-none focus:border-[#111214]"
             />
           </div>

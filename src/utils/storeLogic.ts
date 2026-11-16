@@ -78,6 +78,14 @@ export function formatCurrency(amount: number, currencySymbol = 'Rs.'): string {
   return `${currencySymbol} ${formatted}`;
 }
 
+export const PKR_PER_USDT = 285;
+
+export function formatUsdtAmount(pkrAmount: number, rate = PKR_PER_USDT): string {
+  const safeAmount = Number.isFinite(pkrAmount) ? Math.max(0, pkrAmount) : 0;
+  const safeRate = Number.isFinite(rate) && rate > 0 ? rate : PKR_PER_USDT;
+  return `${(safeAmount / safeRate).toFixed(2)} USDT`;
+}
+
 export function computeDiscountPercent(price: number, originalPrice?: number): number {
   if (!originalPrice || originalPrice <= price || price <= 0) return 0;
   return Math.round(((originalPrice - price) / originalPrice) * 100);
