@@ -7,7 +7,6 @@ import {
   ExternalLink,
   ImagePlus,
   MessageCircle,
-  Share2,
   Trash2,
   X,
 } from 'lucide-react';
@@ -64,56 +63,6 @@ async function readImageFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
-async function dataUrlToPngBlobAndFile(
-  dataUrl: string,
-  filename: string
-): Promise<{ blob: Blob; file: File } | null> {
-  if (!dataUrl) return null;
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width || 600;
-      canvas.height = img.height || 600;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        resolve(null);
-        return;
-      }
-      ctx.drawImage(img, 0, 0);
-      canvas.toBlob((blob) => {
-        if (!blob) {
-          resolve(null);
-          return;
-        }
-        const safeName = filename.replace(/\.[^.]+$/, '') || 'payment-screenshot';
-        const file = new File([blob], `${safeName}.png`, { type: 'image/png' });
-        resolve({ blob, file });
-      }, 'image/png');
-    };
-    img.onerror = () => resolve(null);
-    img.src = dataUrl;
-  });
-}
-
-async function copyScreenshotImageToClipboard(dataUrl: string): Promise<boolean> {
-  try {
-    if (
-      typeof ClipboardItem === 'undefined' ||
-      !navigator.clipboard ||
-      typeof navigator.clipboard.write !== 'function'
-    ) {
-      return false;
-    }
-    const result = await dataUrlToPngBlobAndFile(dataUrl, 'payment-screenshot');
-    if (!result) return false;
-    await navigator.clipboard.write([new ClipboardItem({ 'image/png': result.blob })]);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps) {
   const enabledGateways = resolveCheckoutGateways(settings.gateways, product.allowedGateways);
   const [selectedGatewayId, setSelectedGatewayId] = useState<GatewayId>(
@@ -127,14 +76,11 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
   const [screenshotName, setScreenshotName] = useState('');
   const [copiedPhone, setCopiedPhone] = useState(false);
   const [copiedAccount, setCopiedAccount] = useState(false);
-  const [copiedScreenshot, setCopiedScreenshot] = useState(false);
-  const [canShareScreenshot, setCanShareScreenshot] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [confirmedOrder, setConfirmedOrder] = useState<{
     order: Order;
     whatsappUrl: string;
-    whatsappMessage: string;
   } | null>(null);
 
   const activeGateway =
@@ -167,34 +113,6 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
       setTimeout(() => setCopiedAccount(false), 2000);
     } catch {
       // Ignore clipboard failure
-    }
-  };
-
-  const handleCopyScreenshot = async () => {
-    const ok = await copyScreenshotImageToClipboard(screenshotDataUrl);
-    if (ok) {
-      setCopiedScreenshot(true);
-      setTimeout(() => setCopiedScreenshot(false), 3000);
-    }
-  };
-
-  const handleNativeShareWithImage = async () => {
-    if (!confirmedOrder) return;
-    try {
-      const converted = await dataUrlToPngBlobAndFile(
-        screenshotDataUrl,
-        `payment-${confirmedOrder.order.orderCode}`
-      );
-      if (converted && navigator.share && navigator.canShare?.({ files: [converted.file] })) {
-        await navigator.share({
-          title: `Order ${confirmedOrder.order.orderCode}`,
-          text: confirmedOrder.whatsappMessage,
-          files: [converted.file],
-        });
-        return;
-      }
-    } catch {
-      // User dismissed share or share unavailable
     }
   };
 
@@ -249,36 +167,9 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
         screenshotDataUrl,
       });
 
-      const copied = await copyScreenshotImageToClipboard(screenshotDataUrl);
-      setCopiedScreenshot(copied);
-
-      const converted = await dataUrlToPngBlobAndFile(
-        screenshotDataUrl,
-        `payment-${result.order.orderCode}`
-      );
-      const supportsFileShare = Boolean(
-        converted &&
-          typeof navigator.share === 'function' &&
-          typeof navigator.canShare === 'function' &&
-          navigator.canShare({ files: [converted.file] })
-      );
-      setCanShareScreenshot(supportsFileShare);
-
-      const whatsappMessage = [
-        `Assalam o Alaikum! Order *${result.order.orderCode}*`,
-        `Tool: ${result.order.productName} (${result.order.planLabel})`,
-        `Amount: ${formatCurrency(result.order.amount, result.order.currencySymbol)}`,
-        `Method: ${result.order.paymentMethodLabel}`,
-        `Name: ${result.order.customerName}`,
-        result.order.transactionRef ? `Ref: ${result.order.transactionRef}` : '',
-      ]
-        .filter(Boolean)
-        .join('\n');
-
       setConfirmedOrder({
         order: result.order,
         whatsappUrl: result.whatsappUrl,
-        whatsappMessage,
       });
     } catch (err) {
       const msg =
@@ -381,9 +272,7 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
                 <div className="flex items-center gap-2 text-[#059669]">
                   <CheckCircle2 className="w-5 h-5" />
                   <span className="text-sm font-semibold">
-                    {copiedScreenshot
-                      ? 'Order saved & screenshot copied — paste (Ctrl+V) in WhatsApp!'
-                      : 'Order saved — send screenshot on WhatsApp'}
+                    Order saved — send screenshot on WhatsApp within 15 minutes
                   </span>
                 </div>
 
@@ -412,63 +301,23 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
                       {confirmedOrder.order.paymentMethodLabel}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2.5">
-                    {screenshotDataUrl && (
-                      <img
-                        src={screenshotDataUrl}
-                        alt="Attached payment screenshot"
-                        className="w-10 h-10 object-cover rounded-lg border border-[#A7F3D0] shrink-0"
-                      />
-                    )}
-                    <div className="min-w-0">
-                      <span className="block text-xs text-[#525866]">Screenshot</span>
-                      <span className="font-medium text-[#059669] truncate block">
-                        {copiedScreenshot ? 'Copied (Ctrl+V)' : 'Attached'}
-                      </span>
-                    </div>
+                  <div>
+                    <span className="block text-xs text-[#525866]">Status</span>
+                    <span className="font-medium text-[#059669]">Pending Verification</span>
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2.5">
-                {canShareScreenshot && (
-                  <button
-                    type="button"
-                    onClick={handleNativeShareWithImage}
-                    className="flex-1 inline-flex items-center justify-center gap-2 min-h-[44px] px-4 py-2.5 text-sm font-semibold text-white bg-[#059669] rounded-lg hover:bg-[#047857] cursor-pointer"
-                  >
-                    <Share2 className="w-4 h-4" />
-                    Share Screenshot + Message to WhatsApp
-                  </button>
-                )}
-
-                <a
-                  href={confirmedOrder.whatsappUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`flex-1 inline-flex items-center justify-center gap-2 min-h-[44px] px-4 py-2.5 text-sm font-semibold rounded-lg ${
-                    canShareScreenshot
-                      ? 'bg-[#0D0F12] text-white hover:bg-[#272A30]'
-                      : 'bg-[#059669] text-white hover:bg-[#047857]'
-                  }`}
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  Open WhatsApp Chat
-                </a>
-
-                <button
-                  type="button"
-                  onClick={handleCopyScreenshot}
-                  className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3.5 py-2.5 text-xs font-semibold text-[#0D0F12] bg-[#F4F5F7] border border-[#E2E5EA] rounded-lg hover:bg-[#E2E5EA] cursor-pointer"
-                >
-                  {copiedScreenshot ? (
-                    <Check className="w-3.5 h-3.5 text-[#059669]" />
-                  ) : (
-                    <Copy className="w-3.5 h-3.5" />
-                  )}
-                  {copiedScreenshot ? 'Screenshot Copied' : 'Copy Screenshot'}
-                </button>
-              </div>
+              <a
+                href={confirmedOrder.whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full inline-flex items-center justify-center gap-2 min-h-[44px] px-4 py-2.5 text-sm font-semibold text-white bg-[#059669] rounded-lg hover:bg-[#047857]"
+              >
+                <MessageCircle className="w-4 h-4" />
+                Open WhatsApp Chat
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
