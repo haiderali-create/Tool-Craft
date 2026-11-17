@@ -1,12 +1,16 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Search } from 'lucide-react';
+import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 import { createDefaultSettings } from './data/defaultStoreSeed';
 import { auth } from './firebase';
 import {
   fetchStorefrontWithFallback,
   isAuthorizedAdminUser,
+  readCachedStorefront,
   signOutAdminFirebase,
+  subscribeStorefrontRealtime,
+  writeCachedStorefront,
 } from './services/firestoreStore';
 import type { Product, ProductCategory, StoreSettings } from './types';
 import {
@@ -28,10 +32,17 @@ import { AdminDashboard } from './components/AdminDashboard';
 const DEFAULT_SETTINGS: StoreSettings = createDefaultSettings();
 
 export default function App() {
-  const [settings, setSettings] = useState<StoreSettings>(DEFAULT_SETTINGS);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialSnapshot] = useState(() => readCachedStorefront());
+  const [settings, setSettings] = useState<StoreSettings>(
+    () => initialSnapshot?.settings || DEFAULT_SETTINGS
+  );
+  const [products, setProducts] = useState<Product[]>(() => initialSnapshot?.products || []);
+  const [loading, setLoading] = useState<boolean>(() => !initialSnapshot);
   const [loadError, setLoadError] = useState('');
+  const latestSettingsRef = useRef<StoreSettings>(settings);
+  const latestProductsRef = useRef<Product[]>(products);
+  latestSettingsRef.current = settings;
+  latestProductsRef.current = products;
 
   const [selectedCategory, setSelectedCategory] = useState<ProductCategory | 'All'>('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -55,9 +66,13 @@ export default function App() {
       const data = await fetchStorefrontWithFallback();
       setSettings(data.settings);
       setProducts(data.products || []);
+      latestSettingsRef.current = data.settings;
+      latestProductsRef.current = data.products || [];
       setLoadError('');
     } catch {
-      setLoadError('Unable to load products right now. Please refresh.');
+      if (latestProductsRef.current.length === 0) {
+        setLoadError('Unable to load products right now. Please refresh.');
+      }
     } finally {
       setLoading(false);
     }
@@ -95,6 +110,23 @@ export default function App() {
   useEffect(() => {
     fetchStorefront();
     checkAdminSession();
+    const unsubscribeRealtime = subscribeStorefrontRealtime({
+      onSettings: (nextSettings) => {
+        setSettings(nextSettings);
+        latestSettingsRef.current = nextSettings;
+        if (latestProductsRef.current.length > 0) {
+          writeCachedStorefront(nextSettings, latestProductsRef.current);
+        }
+      },
+      onProducts: (nextProducts) => {
+        setProducts(nextProducts);
+        latestProductsRef.current = nextProducts;
+        setLoading(false);
+        setLoadError('');
+        writeCachedStorefront(latestSettingsRef.current, nextProducts);
+      },
+    });
+    return () => unsubscribeRealtime();
   }, [fetchStorefront, checkAdminSession]);
 
   useEffect(() => {
@@ -196,22 +228,64 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F4F5F7] text-[#0D0F12]">
-      <Navbar
-        storeName={settings.storeName}
-        whatsappNumber={settings.whatsappNumber}
-      />
+      {loading && !initialSnapshot ? (
+        <>
+          <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-[#E2E5EA]">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+              <div className="h-7 w-32 rounded-md bg-[#E2E5EA] animate-pulse" />
+              <div className="h-9 w-28 rounded-lg bg-[#E2E5EA] animate-pulse" />
+            </div>
+          </header>
 
-      <main className="flex-1">
-        <HeroSection
-          tagline={settings.tagline}
-          whatsappDisplay={settings.whatsappDisplay}
-          whatsappNumber={settings.whatsappNumber}
-          toolCount={products.length}
-          heroProducts={heroProducts}
-          onSelectProduct={(p) => setCheckoutProduct(p)}
-          gatewayNamesText={activeGatewayNames}
-          gatewayStripText={activeGatewayStrip}
-        />
+          <main className="flex-1">
+            <section className="pt-8 pb-10 sm:pt-12 sm:pb-12 bg-white border-b border-[#E2E5EA]">
+              <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                <div className="lg:col-span-7 space-y-4">
+                  <div className="h-4 w-48 rounded bg-[#E2E5EA] animate-pulse" />
+                  <div className="h-12 w-3/4 rounded-lg bg-[#E2E5EA] animate-pulse" />
+                  <div className="h-5 w-2/3 rounded bg-[#F4F5F7] animate-pulse" />
+                  <div className="flex gap-3 pt-2">
+                    <div className="h-11 w-36 rounded-lg bg-[#E2E5EA] animate-pulse" />
+                    <div className="h-11 w-44 rounded-lg bg-[#F4F5F7] animate-pulse" />
+                  </div>
+                </div>
+                <div className="lg:col-span-5 grid grid-cols-2 gap-3">
+                  {[1, 2, 3, 4].map((n) => (
+                    <div key={n} className="h-16 rounded-xl bg-[#F4F5F7] border border-[#E2E5EA] animate-pulse" />
+                  ))}
+                </div>
+              </div>
+            </section>
+            <section className="py-10 sm:py-12">
+              <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {[1, 2, 3, 4, 5, 6].map((idx) => (
+                  <div
+                    key={idx}
+                    className="h-72 bg-white border border-[#E2E5EA] rounded-xl animate-pulse"
+                  />
+                ))}
+              </div>
+            </section>
+          </main>
+        </>
+      ) : (
+        <>
+          <Navbar
+            storeName={settings.storeName}
+            whatsappNumber={settings.whatsappNumber}
+          />
+
+          <main className="flex-1">
+            <HeroSection
+              tagline={settings.tagline}
+              whatsappDisplay={settings.whatsappDisplay}
+              whatsappNumber={settings.whatsappNumber}
+              toolCount={products.length}
+              heroProducts={heroProducts}
+              onSelectProduct={(p) => setCheckoutProduct(p)}
+              gatewayNamesText={activeGatewayNames}
+              gatewayStripText={activeGatewayStrip}
+            />
 
         {/* Catalog & Categories Section */}
         <section id="catalog" className="py-10 sm:py-12">
@@ -293,72 +367,99 @@ export default function App() {
             </div>
 
             {/* Product Grid */}
-            {loading ? (
-              <div className="mt-7 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {[1, 2, 3].map((idx) => (
-                  <div
-                    key={idx}
-                    className="h-72 bg-white border border-[#E2E5EA] rounded-xl animate-pulse"
-                  />
-                ))}
-              </div>
-            ) : loadError ? (
-              <div className="mt-7 p-8 bg-white border border-[#E2E5EA] rounded-xl text-center space-y-3">
-                <p className="text-sm text-[#DC2626]">{loadError}</p>
-                <button
-                  type="button"
-                  onClick={fetchStorefront}
-                  className="px-4 py-2 text-xs font-semibold text-white bg-[#0D0F12] rounded-lg cursor-pointer"
+            <MotionConfig reducedMotion="user">
+              {loading ? (
+                <div className="mt-7 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {[1, 2, 3].map((idx) => (
+                    <div
+                      key={idx}
+                      className="h-72 bg-white border border-[#E2E5EA] rounded-xl animate-pulse"
+                    />
+                  ))}
+                </div>
+              ) : loadError ? (
+                <div className="mt-7 p-8 bg-white border border-[#E2E5EA] rounded-xl text-center space-y-3">
+                  <p className="text-sm text-[#DC2626]">{loadError}</p>
+                  <button
+                    type="button"
+                    onClick={fetchStorefront}
+                    className="px-4 py-2 text-xs font-semibold text-white bg-[#0D0F12] rounded-lg cursor-pointer"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : visibleProducts.length === 0 ? (
+                <motion.div
+                  key="empty-catalog"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="mt-7 p-10 bg-white border border-[#E2E5EA] rounded-xl text-center space-y-3"
                 >
-                  Retry
-                </button>
-              </div>
-            ) : visibleProducts.length === 0 ? (
-              <div className="mt-7 p-10 bg-white border border-[#E2E5EA] rounded-xl text-center space-y-3">
-                <p className="text-sm text-[#525866]">
-                  No AI tools found matching your filter.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedCategory('All');
-                    setSearchQuery('');
-                  }}
-                  className="px-4 py-2 text-xs font-semibold text-white bg-[#0D0F12] rounded-lg cursor-pointer"
+                  <p className="text-sm text-[#525866]">
+                    No AI tools found matching your filter.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCategory('All');
+                      setSearchQuery('');
+                    }}
+                    className="px-4 py-2 text-xs font-semibold text-white bg-[#0D0F12] rounded-lg cursor-pointer"
+                  >
+                    Reset Filters
+                  </button>
+                </motion.div>
+              ) : (
+                <motion.div
+                  layout
+                  data-testid="product-grid"
+                  className="mt-7 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"
                 >
-                  Reset Filters
-                </button>
-              </div>
-            ) : (
-              <div
-                data-testid="product-grid"
-                className="mt-7 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"
-              >
-                {visibleProducts.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    currencySymbol={settings.currencySymbol}
-                    onBuyNow={(p) => setCheckoutProduct(p)}
-                  />
-                ))}
-              </div>
-            )}
+                  <AnimatePresence initial={false}>
+                    {visibleProducts.map((product) => (
+                      <motion.div
+                        key={product.id}
+                        layout="position"
+                        initial={{ opacity: 0, scale: 0.96, y: 10 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.94, transition: { duration: 0.12 } }}
+                        transition={{
+                          layout: { type: 'spring', stiffness: 420, damping: 32 },
+                          opacity: { duration: 0.18 },
+                          scale: { duration: 0.18 },
+                          y: { duration: 0.18 },
+                        }}
+                        className="flex"
+                      >
+                        <ProductCard
+                          product={product}
+                          currencySymbol={settings.currencySymbol}
+                          onBuyNow={(p) => setCheckoutProduct(p)}
+                        />
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </motion.div>
+              )}
+            </MotionConfig>
           </div>
         </section>
 
         <HowItWorksSection gatewayNamesText={activeGatewayNames} />
-      </main>
+          </main>
 
-      <Footer
-        storeName={settings.storeName}
-        tagline={settings.tagline}
-        whatsappDisplay={settings.whatsappDisplay}
-        whatsappNumber={settings.whatsappNumber}
-        supportHours={settings.supportHours}
-        onSelectCategory={(cat) => setSelectedCategory(cat)}
-        onOpenAdmin={handleOpenAdmin}
-      />
+          <Footer
+            storeName={settings.storeName}
+            tagline={settings.tagline}
+            whatsappDisplay={settings.whatsappDisplay}
+            whatsappNumber={settings.whatsappNumber}
+            supportHours={settings.supportHours}
+            onSelectCategory={(cat) => setSelectedCategory(cat)}
+            onOpenAdmin={handleOpenAdmin}
+          />
+        </>
+      )}
 
       {checkoutProduct && (
         <CheckoutModal

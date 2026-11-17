@@ -4,6 +4,7 @@ import type {
   PaymentGatewayConfig,
   Product,
   ProductCategory,
+  StoreSettings,
 } from '../types.ts';
 
 export const PRODUCT_CATEGORIES: ProductCategory[] = [
@@ -408,4 +409,40 @@ export function selectHeroShowcaseProducts(products: Product[], limit = 6): Prod
     return b.createdAt.localeCompare(a.createdAt);
   });
   return sorted.slice(0, Math.max(0, limit));
+}
+
+export function parseStorefrontSnapshot(
+  raw: string | null | undefined
+): { settings: StoreSettings; products: Product[] } | null {
+  if (!raw || typeof raw !== 'string') return null;
+  try {
+    const parsed = JSON.parse(raw) as {
+      settings?: Partial<StoreSettings>;
+      products?: unknown[];
+    };
+    if (
+      !parsed ||
+      typeof parsed !== 'object' ||
+      !parsed.settings ||
+      typeof parsed.settings.storeName !== 'string' ||
+      !Array.isArray(parsed.settings.gateways) ||
+      !Array.isArray(parsed.products)
+    ) {
+      return null;
+    }
+    const validProducts = parsed.products.filter(
+      (item): item is Product =>
+        Boolean(item) &&
+        typeof item === 'object' &&
+        typeof (item as Product).id === 'string' &&
+        typeof (item as Product).name === 'string' &&
+        typeof (item as Product).price === 'number'
+    );
+    return {
+      settings: parsed.settings as StoreSettings,
+      products: validProducts,
+    };
+  } catch {
+    return null;
+  }
 }

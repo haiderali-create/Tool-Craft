@@ -14,7 +14,7 @@ export function ProductCard({ product, currencySymbol, onBuyNow }: ProductCardPr
   const discountPct = computeDiscountPercent(product.price, product.originalPrice);
 
   return (
-    <article className="group flex flex-col bg-white border border-[#E2E5EA] rounded-xl p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-[#B8BFC9] hover:shadow-sm">
+    <article className="group w-full flex flex-col bg-white border border-[#E2E5EA] rounded-xl p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-[#B8BFC9] hover:shadow-sm">
       {/* Top Row: Official Tool Logo + Clean Offer / Top Selling Kicker */}
       <div className="flex items-start justify-between gap-3">
         <ToolLogo

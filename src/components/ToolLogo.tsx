@@ -20,6 +20,37 @@ const SVG_SIZES = {
   lg: 'w-8 h-8',
 };
 
+function isUsableLogoUrl(url?: string): url is string {
+  const cleanUrl = url?.trim();
+  if (!cleanUrl) return false;
+  if (
+    cleanUrl.startsWith('https://') ||
+    cleanUrl.startsWith('http://') ||
+    cleanUrl.startsWith('/')
+  ) {
+    return true;
+  }
+  if (cleanUrl.startsWith('data:image/')) {
+    const commaIdx = cleanUrl.indexOf(',');
+    if (commaIdx === -1) return false;
+    const meta = cleanUrl.slice(0, commaIdx).toLowerCase();
+    const payload = cleanUrl.slice(commaIdx + 1).trim();
+    if (!payload) return false;
+    if (meta.includes(';base64')) {
+      // Firestore logoUrl cap (1024 chars) truncates oversized uploads; detect invalid/truncated base64 safely
+      if (cleanUrl.length >= 1024 && !meta.includes('svg')) return false;
+      try {
+        atob(payload);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
 export function ToolLogo({ name, logoKey, logoUrl, size = 'md' }: ToolLogoProps) {
   const [imgFailed, setImgFailed] = useState(false);
 
@@ -32,14 +63,7 @@ export function ToolLogo({ name, logoKey, logoUrl, size = 'md' }: ToolLogoProps)
   const iconClass = SVG_SIZES[size];
 
   const cleanUrl = logoUrl?.trim();
-  if (
-    cleanUrl &&
-    !imgFailed &&
-    (cleanUrl.startsWith('https://') ||
-      cleanUrl.startsWith('http://') ||
-      cleanUrl.startsWith('data:image/') ||
-      cleanUrl.startsWith('/'))
-  ) {
+  if (cleanUrl && !imgFailed && isUsableLogoUrl(cleanUrl)) {
     return (
       <div
         className={`${boxClass} bg-white border border-[#E2E5EA] flex items-center justify-center overflow-hidden p-1.5 shrink-0`}

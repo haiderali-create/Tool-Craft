@@ -14,6 +14,7 @@ import {
   normalizeDomainInput,
   parseApiEndpointLines,
   parseKeyList,
+  parseStorefrontSnapshot,
   resolveBrandKeyFromName,
   resolveCheckoutGateways,
   sanitizeWhatsappPhone,
@@ -21,7 +22,7 @@ import {
   validateOrderInput,
   validateProductInput,
 } from './storeLogic.ts';
-import type { Order, PaymentGatewayConfig, Product } from '../types.ts';
+import type { Order, PaymentGatewayConfig, Product, StoreSettings } from '../types.ts';
 
 const sampleProducts: Product[] = [
   {
@@ -336,4 +337,39 @@ test('selectHeroShowcaseProducts reflects deletions and featuredInHero toggles d
     afterDelete.map((p) => p.id),
     ['p4', 'p2']
   );
+});
+
+test('parseStorefrontSnapshot validates cached settings and products safely', () => {
+  assert.equal(parseStorefrontSnapshot(null), null);
+  assert.equal(parseStorefrontSnapshot('{bad json'), null);
+  assert.equal(parseStorefrontSnapshot(JSON.stringify({ settings: {}, products: [] })), null);
+
+  const validSettings: StoreSettings = {
+    storeName: 'Haider Store',
+    tagline: 'Custom tagline',
+    whatsappNumber: '923001234567',
+    whatsappDisplay: '+92 300 1234567',
+    currencySymbol: 'Rs.',
+    deliverySla: '10 min',
+    gateways: [
+      {
+        id: 'easypaisa',
+        label: 'Easypaisa',
+        enabled: true,
+        accountTitle: 'Haider Ali',
+        accountNumber: '03001234567',
+        instructions: 'Send Easypaisa',
+      },
+    ],
+  };
+
+  const parsed = parseStorefrontSnapshot(
+    JSON.stringify({
+      settings: validSettings,
+      products: sampleProducts,
+    })
+  );
+  assert.ok(parsed);
+  assert.equal(parsed.settings.storeName, 'Haider Store');
+  assert.equal(parsed.products.length, 3);
 });

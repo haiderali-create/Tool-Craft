@@ -43,11 +43,14 @@ import {
   updateSettingsFirestore,
 } from '../services/firestoreStore';
 import {
+  buildLogoCandidateUrls,
   computeDiscountPercent,
   computeInventorySummary,
   filterAndSortProducts,
   formatAutoFetchSourceLabel,
   formatCurrency,
+  normalizeDomainInput,
+  parseApiEndpointLines,
   PRODUCT_CATEGORIES,
   resolveBrandKeyFromName,
   validateProductInput,
@@ -80,6 +83,7 @@ interface ProductFormState {
   inStock: boolean;
   logoKey: string;
   logoUrl: string;
+  officialDomain: string;
   description: string;
   featuresText: string;
   allowedGateways: GatewayId[];
@@ -98,6 +102,7 @@ const EMPTY_FORM: ProductFormState = {
   inStock: true,
   logoKey: 'generic',
   logoUrl: '',
+  officialDomain: '',
   description: '',
   featuresText: 'Instant WhatsApp activation\nFull term warranty',
   allowedGateways: [],
@@ -127,10 +132,13 @@ export function AdminDashboard({
   const [categoryFilter, setCategoryFilter] = useState<ProductCategory | 'All'>('All');
 
   const [editorOpen, setEditorOpen] = useState(false);
+  const [editorTab, setEditorTab] = useState<'details' | 'auto-logo'>('details');
   const [formState, setFormState] = useState<ProductFormState>(EMPTY_FORM);
   const [formError, setFormError] = useState('');
   const [savingProduct, setSavingProduct] = useState(false);
   const [autoFetching, setAutoFetching] = useState(false);
+  const [lookupEndpointsDraft, setLookupEndpointsDraft] = useState('');
+  const [savingLookupEndpoints, setSavingLookupEndpoints] = useState(false);
 
   const [previewOrder, setPreviewOrder] = useState<Order | null>(null);
 
@@ -299,6 +307,8 @@ export function AdminDashboard({
 
   const openAddProduct = () => {
     setFormState(EMPTY_FORM);
+    setLookupEndpointsDraft((settings?.autoFetchEndpoints || []).join('\n'));
+    setEditorTab('details');
     setAutoFetchSource('');
     setFormError('');
     setEditorOpen(true);
@@ -317,27 +327,94 @@ export function AdminDashboard({
       inStock: product.inStock,
       logoKey: product.logoKey,
       logoUrl: product.logoUrl || '',
+      officialDomain: '',
       description: product.description,
       featuresText: product.features.join('\n'),
       allowedGateways: product.allowedGateways || [],
       featuredInHero: product.featuredInHero !== false,
       active: product.active,
     });
+    setLookupEndpointsDraft((settings?.autoFetchEndpoints || []).join('\n'));
+    setEditorTab('details');
     setAutoFetchSource('');
     setFormError('');
     setEditorOpen(true);
   };
 
-  const handleAutoFetchLogoAndInfo = async () => {
+  const persistLookupEndpoints = async (rawLines: string): Promise<string[] | null> => {
+    const cleanEndpoints = parseApiEndpointLines(rawLines);
+    setSavingLookupEndpoints(true);
+    setFormError('');
+    try {
+      if (authMode === 'firebase') {
+        const updatedSettings = await updateSettingsFirestore({
+          autoFetchEndpoints: cleanEndpoints,
+        });
+        setSettings(updatedSettings);
+        setSettingsDraft(updatedSettings);
+        setLookupEndpointsDraft((updatedSettings.autoFetchEndpoints || []).join('\n'));
+        return updatedSettings.autoFetchEndpoints || [];
+      }
+
+      const res = await adminFetch('/api/admin/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ autoFetchEndpoints: cleanEndpoints }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setFormError(data.error || 'Unable to save lookup APIs.');
+        return null;
+      }
+      setSettings(data.settings);
+      setSettingsDraft(data.settings);
+      setLookupEndpointsDraft((data.settings.autoFetchEndpoints || []).join('\n'));
+      return data.settings.autoFetchEndpoints || [];
+    } catch (err) {
+      setFormError(
+        err instanceof Error && err.message ? err.message : 'Unable to save lookup APIs.'
+      );
+      return null;
+    } finally {
+      setSavingLookupEndpoints(false);
+    }
+  };
+
+  const handleAutoFetchLogoAndInfo = async (options?: {
+    endpointsOverride?: string[];
+    domainOverride?: string;
+  }) => {
     const cleanName = formState.name.trim();
-    if (cleanName.length < 2) {
-      setFormError('Enter a tool name first (e.g. CapCut Pro, Runway, Suno) then click Auto-Fetch.');
+    const cleanDomain = normalizeDomainInput(
+      options?.domainOverride ?? formState.officialDomain
+    );
+    if (cleanName.length < 2 && !cleanDomain) {
+      setFormError(
+        'Enter a tool name (e.g. CapCut Pro, Runway) or official website domain first.'
+      );
       return;
     }
+
+    const activeEndpoints =
+      options?.endpointsOverride ??
+      parseApiEndpointLines(
+        lookupEndpointsDraft || (settings?.autoFetchEndpoints || []).join('\n')
+      );
 
     setAutoFetching(true);
     setFormError('');
     try {
+      if (cleanName.length < 2 && cleanDomain) {
+        const candidates = buildLogoCandidateUrls(cleanDomain);
+        setFormState((prev) => ({
+          ...prev,
+          logoUrl: candidates[0] || prev.logoUrl,
+        }));
+        setAutoFetchSource('Smart Domain Logo Lookup');
+        showToast(`Auto-logo applied from ${cleanDomain}`);
+        return;
+      }
+
       let data: {
         logoKey?: string;
         logoUrl?: string;
@@ -357,6 +434,8 @@ export function AdminDashboard({
           headers,
           body: JSON.stringify({
             name: cleanName,
+            domain: cleanDomain || undefined,
+            endpoints: activeEndpoints,
           }),
         });
         const contentType = res.headers.get('content-type') || '';
@@ -370,13 +449,15 @@ export function AdminDashboard({
       if (!data) {
         data = await autoFetchToolInfoClientFallback({
           name: cleanName,
+          domain: cleanDomain || undefined,
+          endpointsText: activeEndpoints.join('\n'),
         });
       }
 
       setFormState((prev) => ({
         ...prev,
         logoKey: data?.logoKey || resolveBrandKeyFromName(cleanName),
-        logoUrl: data?.logoUrl || '',
+        logoUrl: data?.logoUrl || prev.logoUrl,
         category: data?.category || prev.category,
         planLabel: data?.planLabel || prev.planLabel,
         description: data?.description || prev.description,
@@ -388,7 +469,7 @@ export function AdminDashboard({
       setAutoFetchSource(sourceLabel);
       showToast(
         sourceLabel
-          ? `Loaded ${cleanName} (${sourceLabel})`
+          ? `Logo & details loaded (${sourceLabel})`
           : `Logo & details loaded for ${cleanName}`
       );
     } catch {
@@ -405,6 +486,13 @@ export function AdminDashboard({
       .map((s) => s.trim())
       .filter(Boolean);
 
+    const normalizedDomain = normalizeDomainInput(formState.officialDomain);
+    const resolvedLogoKey = formState.logoKey || resolveBrandKeyFromName(formState.name);
+    const fallbackDomainLogo =
+      !formState.logoUrl.trim() && normalizedDomain
+        ? buildLogoCandidateUrls(normalizedDomain)[0] || ''
+        : '';
+
     const payload = {
       name: formState.name.trim(),
       category: formState.category,
@@ -415,8 +503,8 @@ export function AdminDashboard({
       topSelling: formState.topSelling,
       inStock: formState.inStock,
       stock: formState.inStock ? 25 : 0,
-      logoKey: formState.logoKey || resolveBrandKeyFromName(formState.name),
-      logoUrl: formState.logoUrl.trim() || undefined,
+      logoKey: resolvedLogoKey,
+      logoUrl: formState.logoUrl.trim() || fallbackDomainLogo || undefined,
       description: formState.description.trim(),
       features,
       allowedGateways: formState.allowedGateways,
@@ -1746,6 +1834,243 @@ export function AdminDashboard({
               </button>
             </div>
 
+            <div
+              role="tablist"
+              aria-label="Product editor sections"
+              className="px-5 pt-3 border-b border-[#E2E5EA] bg-[#F4F5F7]/60 flex items-center gap-2"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={editorTab === 'details'}
+                onClick={() => setEditorTab('details')}
+                className={`px-3.5 py-2 text-xs font-semibold rounded-t-lg border border-b-0 transition-colors cursor-pointer ${
+                  editorTab === 'details'
+                    ? 'bg-white text-[#0D0F12] border-[#E2E5EA]'
+                    : 'bg-transparent text-[#525866] border-transparent hover:text-[#0D0F12]'
+                }`}
+              >
+                Product Details
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={editorTab === 'auto-logo'}
+                onClick={() => setEditorTab('auto-logo')}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-t-lg border border-b-0 transition-colors cursor-pointer ${
+                  editorTab === 'auto-logo'
+                    ? 'bg-white text-[#059669] border-[#E2E5EA]'
+                    : 'bg-transparent text-[#525866] border-transparent hover:text-[#0D0F12]'
+                }`}
+              >
+                <Server className="w-3.5 h-3.5" />
+                Auto-Logo &amp; Lookup API
+              </button>
+            </div>
+
+            {editorTab === 'auto-logo' ? (
+              <div className="p-5 space-y-4">
+                <div className="p-3.5 rounded-xl bg-[#F4F5F7] border border-[#E2E5EA] flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <ToolLogo
+                      name={formState.name || 'AI'}
+                      logoKey={formState.logoKey}
+                      logoUrl={formState.logoUrl}
+                      size="md"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-[#0D0F12] truncate">
+                        {formState.name.trim() || 'New Tool Logo Preview'}
+                      </p>
+                      <p className="text-[11px] text-[#525866] truncate">
+                        {autoFetchSource
+                          ? `Applied via ${autoFetchSource}`
+                          : formState.logoUrl
+                          ? 'Custom / auto-resolved logo active'
+                          : 'Enter tool name or domain to apply auto-logo'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={autoFetching}
+                    onClick={() => handleAutoFetchLogoAndInfo()}
+                    className="inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-1.5 text-xs font-semibold text-white bg-[#059669] rounded-lg hover:bg-[#047857] cursor-pointer shrink-0"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    {autoFetching ? 'Fetching...' : 'Fetch Auto-Logo'}
+                  </button>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="prod-official-domain"
+                    className="block text-xs font-semibold text-[#0D0F12] mb-1"
+                  >
+                    Official Website Domain (Optional — Instant Auto-Logo)
+                  </label>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      id="prod-official-domain"
+                      type="text"
+                      value={formState.officialDomain}
+                      onChange={(e) =>
+                        setFormState({ ...formState, officialDomain: e.target.value })
+                      }
+                      placeholder="e.g. klingai.com, runwayml.com, cursor.com"
+                      className="flex-1 min-h-[40px] px-3 py-2 text-xs font-mono bg-white border border-[#E2E5EA] rounded-lg"
+                    />
+                    <button
+                      type="button"
+                      disabled={autoFetching}
+                      onClick={() => handleAutoFetchLogoAndInfo()}
+                      className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-3.5 py-2 text-xs font-semibold text-[#0D0F12] bg-[#F4F5F7] border border-[#E2E5EA] rounded-lg hover:bg-[#E2E5EA] cursor-pointer shrink-0"
+                    >
+                      Apply Auto-Logo
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-[#F4F5F7] border border-[#E2E5EA] space-y-2.5">
+                  <div>
+                    <label
+                      htmlFor="prod-lookup-apis"
+                      className="block text-xs font-semibold text-[#0D0F12]"
+                    >
+                      Custom Lookup API URLs (1 URL per line — auto-failover in order)
+                    </label>
+                    <p className="text-[11px] text-[#525866] mt-0.5">
+                      Add tool metadata lookup URLs (e.g.{' '}
+                      <span className="font-mono">https://your-api.com/lookup?q={'{name}'}</span>)
+                      to resolve brand logos &amp; info automatically when adding products.
+                    </p>
+                  </div>
+                  <textarea
+                    id="prod-lookup-apis"
+                    rows={3}
+                    value={lookupEndpointsDraft}
+                    onChange={(e) => setLookupEndpointsDraft(e.target.value)}
+                    placeholder={'https://primary-tool-api.example.com/lookup?q={name}\nhttps://backup-tool-api.example.com/lookup?q={name}'}
+                    className="w-full px-3 py-2 text-xs font-mono bg-white border border-[#E2E5EA] rounded-lg"
+                  />
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[11px] text-[#525866]">
+                      {parseApiEndpointLines(lookupEndpointsDraft).length} valid endpoint URL(s) ready
+                    </span>
+                    <button
+                      type="button"
+                      disabled={savingLookupEndpoints || autoFetching}
+                      onClick={async () => {
+                        const saved = await persistLookupEndpoints(lookupEndpointsDraft);
+                        if (saved !== null) {
+                          showToast(
+                            saved.length > 0
+                              ? `Saved ${saved.length} lookup API URL(s)`
+                              : 'Custom lookup API list cleared'
+                          );
+                          if (formState.name.trim().length >= 2 || formState.officialDomain.trim()) {
+                            await handleAutoFetchLogoAndInfo({ endpointsOverride: saved });
+                          }
+                        }
+                      }}
+                      className="inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-1.5 text-xs font-semibold text-white bg-[#0D0F12] rounded-lg hover:bg-[#059669] cursor-pointer"
+                    >
+                      {savingLookupEndpoints ? 'Saving...' : 'Save Lookup APIs & Apply Logo'}
+                    </button>
+                  </div>
+
+                  {settings?.autoFetchEndpoints && settings.autoFetchEndpoints.length > 0 && (
+                    <div className="pt-2 space-y-1.5">
+                      {settings.autoFetchEndpoints.map((epUrl, idx) => (
+                        <div
+                          key={`${epUrl}-${idx}`}
+                          className="p-2 bg-white border border-[#E2E5EA] rounded-lg flex items-center justify-between gap-2"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-[11px] font-mono font-bold text-[#525866] bg-[#F4F5F7] px-1.5 py-0.5 rounded shrink-0">
+                              #{idx + 1}
+                            </span>
+                            <span className="text-xs font-mono text-[#0D0F12] truncate">
+                              {epUrl}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={savingLookupEndpoints}
+                            onClick={async () => {
+                              const remaining = (settings.autoFetchEndpoints || []).filter(
+                                (_, i) => i !== idx
+                              );
+                              const saved = await persistLookupEndpoints(remaining.join('\n'));
+                              if (saved !== null) {
+                                showToast('Removed lookup API URL');
+                              }
+                            }}
+                            aria-label={`Remove lookup API #${idx + 1}`}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-semibold text-[#DC2626] bg-[#FEF2F2] border border-[#FECACA] rounded cursor-pointer shrink-0"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            Delete
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-[#ECFDF5] border border-[#A7F3D0] space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                          aiStatus.serverGeminiKeyCount > 0 ? 'bg-[#059669]' : 'bg-[#D97706]'
+                        }`}
+                      />
+                      <span className="text-xs font-bold text-[#065F46]">
+                        Server Gemini AI: {aiStatus.serverGeminiKeyCount} Key
+                        {aiStatus.serverGeminiKeyCount === 1 ? '' : 's'} Active
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={refreshingAiStatus}
+                      onClick={handleRefreshAiStatus}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-[#065F46] bg-white border border-[#A7F3D0] rounded-lg cursor-pointer"
+                    >
+                      <RefreshCw
+                        className={`w-3 h-3 ${refreshingAiStatus ? 'animate-spin' : ''}`}
+                      />
+                      Refresh
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-[#047857]">
+                    Gemini API keys run securely on the server via hosting secrets/env vars
+                    (browser key inputs are disabled for security) together with{' '}
+                    {aiStatus.brandPresetCount} built-in brand logos.
+                  </p>
+                </div>
+
+                {formError && (
+                  <div
+                    role="alert"
+                    className="p-3 rounded-lg bg-[#FEF2F2] border border-[#FECACA] text-xs font-medium text-[#B91C1C]"
+                  >
+                    {formError}
+                  </div>
+                )}
+
+                <div className="pt-1 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditorTab('details')}
+                    className="min-h-[42px] px-4 py-2 text-xs font-semibold text-white bg-[#0D0F12] rounded-lg hover:bg-[#059669] cursor-pointer"
+                  >
+                    Back to Product Details
+                  </button>
+                </div>
+              </div>
+            ) : (
             <form onSubmit={handleSaveProduct} className="p-5 space-y-4">
               {/* Tool Name + Live Logo Preview + Auto-Fetch Button */}
               <div className="p-3.5 rounded-xl bg-[#F4F5F7] border border-[#E2E5EA] space-y-3">
@@ -1783,7 +2108,7 @@ export function AdminDashboard({
                       <button
                         type="button"
                         disabled={autoFetching}
-                        onClick={handleAutoFetchLogoAndInfo}
+                        onClick={() => handleAutoFetchLogoAndInfo()}
                         className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-3.5 py-2 text-xs font-semibold text-white bg-[#059669] rounded-lg hover:bg-[#047857] cursor-pointer whitespace-nowrap shrink-0"
                       >
                         <Sparkles className="w-3.5 h-3.5" />
@@ -1794,12 +2119,21 @@ export function AdminDashboard({
                 </div>
 
                 <div>
-                  <label
-                    htmlFor="prod-logo-url"
-                    className="block text-[11px] font-medium text-[#525866] mb-1"
-                  >
-                    Custom Logo URL (auto-filled when available, or paste/upload icon)
-                  </label>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <label
+                      htmlFor="prod-logo-url"
+                      className="block text-[11px] font-medium text-[#525866]"
+                    >
+                      Custom Logo URL (auto-filled when available, or paste/upload icon)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setEditorTab('auto-logo')}
+                      className="text-[11px] font-semibold text-[#059669] hover:underline cursor-pointer shrink-0"
+                    >
+                      Configure Lookup API / Domain →
+                    </button>
+                  </div>
                   <div className="flex gap-2">
                     <input
                       id="prod-logo-url"
@@ -2096,6 +2430,7 @@ export function AdminDashboard({
                 </button>
               </div>
             </form>
+            )}
           </div>
         </div>
       )}

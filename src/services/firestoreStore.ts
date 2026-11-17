@@ -11,6 +11,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  onSnapshot,
   query,
   serverTimestamp,
   setDoc,
@@ -39,6 +40,7 @@ import {
   formatCurrency,
   normalizeDomainInput,
   parseApiEndpointLines,
+  parseStorefrontSnapshot,
   PRODUCT_CATEGORIES,
   resolveBrandKeyFromName,
   sanitizeWhatsappPhone,
@@ -56,6 +58,32 @@ const STOREFRONT_DOC_ID = 'config';
 const PRODUCTS_COLLECTION = 'products';
 const ORDERS_COLLECTION = 'orders';
 const ADMINS_COLLECTION = 'admins';
+const STOREFRONT_CACHE_KEY = 'toolcraft_storefront_snapshot_v1';
+
+export function readCachedStorefront(): { settings: StoreSettings; products: Product[] } | null {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return null;
+    return parseStorefrontSnapshot(window.localStorage.getItem(STOREFRONT_CACHE_KEY));
+  } catch {
+    return null;
+  }
+}
+
+export function writeCachedStorefront(settings: StoreSettings, products: Product[]): void {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    window.localStorage.setItem(
+      STOREFRONT_CACHE_KEY,
+      JSON.stringify({
+        settings,
+        products,
+        cachedAt: Date.now(),
+      })
+    );
+  } catch {
+    // Ignore storage quota / private mode errors
+  }
+}
 
 function toIsoDate(value: unknown, fallback = new Date().toISOString()): string {
   if (value instanceof Timestamp) {
@@ -286,6 +314,7 @@ export async function fetchStorefrontWithFallback(): Promise<{
   source: 'firestore' | 'api' | 'seed';
 }> {
   let settings = createDefaultSettings();
+  let hasFirestoreSettings = false;
   let products: Product[] = [];
 
   try {
@@ -294,22 +323,24 @@ export async function fetchStorefrontWithFallback(): Promise<{
       getDocs(query(collection(db, PRODUCTS_COLLECTION), where('active', '==', true))),
     ]);
     const timeoutGuard = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('firestore-timeout')), 3500)
+      setTimeout(() => reject(new Error('firestore-timeout')), 8500)
     );
     const [configSnap, productsSnap] = await Promise.race([firestoreRead, timeoutGuard]);
 
     if (configSnap.exists()) {
       settings = normalizeSettingsDoc(configSnap.data() as Record<string, unknown>);
+      hasFirestoreSettings = true;
     }
 
     if (!productsSnap.empty) {
       products = productsSnap.docs.map((d) =>
         normalizeProductDoc(d.id, d.data() as Record<string, unknown>)
       );
+      writeCachedStorefront(settings, products);
       return { settings, products, source: 'firestore' };
     }
   } catch {
-    // Fall through to backend API or local catalog seed if Firestore unavailable
+    // Fall through to backend API or cached/default catalog if Firestore unavailable
   }
 
   try {
@@ -318,9 +349,14 @@ export async function fetchStorefrontWithFallback(): Promise<{
     if (res.ok && contentType.includes('application/json')) {
       const data = await res.json();
       if (data?.settings && Array.isArray(data?.products)) {
+        const resolvedSettings = hasFirestoreSettings
+          ? settings
+          : (data.settings as StoreSettings);
+        const resolvedProducts = data.products as Product[];
+        writeCachedStorefront(resolvedSettings, resolvedProducts);
         return {
-          settings: data.settings as StoreSettings,
-          products: data.products as Product[],
+          settings: resolvedSettings,
+          products: resolvedProducts,
           source: 'api',
         };
       }
@@ -329,10 +365,55 @@ export async function fetchStorefrontWithFallback(): Promise<{
     // Static hosts (Netlify / GitHub Pages) won't have /api/storefront
   }
 
+  const cached = readCachedStorefront();
+  if (cached && cached.products.length > 0) {
+    return {
+      settings: hasFirestoreSettings ? settings : cached.settings,
+      products: cached.products,
+      source: 'firestore',
+    };
+  }
+
   return {
     settings,
     products: createDefaultProducts(),
     source: 'seed',
+  };
+}
+
+export function subscribeStorefrontRealtime(handlers: {
+  onSettings: (settings: StoreSettings) => void;
+  onProducts: (products: Product[]) => void;
+}): () => void {
+  const unsubSettings = onSnapshot(
+    doc(db, STOREFRONT_COLLECTION, STOREFRONT_DOC_ID),
+    (snap) => {
+      if (!snap.exists()) return;
+      const nextSettings = normalizeSettingsDoc(snap.data() as Record<string, unknown>);
+      handlers.onSettings(nextSettings);
+    },
+    () => {
+      // Ignore realtime permission/network hiccups; initial fetch handles fallback
+    }
+  );
+
+  const unsubProducts = onSnapshot(
+    query(collection(db, PRODUCTS_COLLECTION), where('active', '==', true)),
+    (snap) => {
+      if (snap.empty && snap.metadata.fromCache) return;
+      const nextProducts = snap.docs.map((d) =>
+        normalizeProductDoc(d.id, d.data() as Record<string, unknown>)
+      );
+      handlers.onProducts(nextProducts);
+    },
+    () => {
+      // Ignore realtime permission/network hiccups; initial fetch handles fallback
+    }
+  );
+
+  return () => {
+    unsubSettings();
+    unsubProducts();
   };
 }
 

@@ -3,6 +3,7 @@ import { BRAND_PRESETS } from '../../src/data/defaultStoreSeed.ts';
 import {
   buildLogoCandidateUrls,
   normalizeDomainInput,
+  parseApiEndpointLines,
   parseKeyList,
   PRODUCT_CATEGORIES,
   resolveBrandKeyFromName,
@@ -61,11 +62,81 @@ export default async function handler(req: Request): Promise<Response> {
     return jsonResponse({ error: 'Unauthorized. Admin authentication required.' }, 401);
   }
 
-  const body = (await req.json().catch(() => ({}))) as { name?: string; domain?: string };
+  const body = (await req.json().catch(() => ({}))) as {
+    name?: string;
+    domain?: string;
+    endpoints?: string[] | string;
+  };
   const rawName = String(body.name || '').trim();
   const explicitDomain = normalizeDomainInput(String(body.domain || ''));
   if (rawName.length < 2) {
     return jsonResponse({ error: 'Enter a tool name first.' }, 400);
+  }
+
+  const customEndpoints =
+    body.endpoints !== undefined
+      ? Array.isArray(body.endpoints)
+        ? parseApiEndpointLines(body.endpoints.join('\n'))
+        : parseApiEndpointLines(String(body.endpoints || ''))
+      : [];
+
+  for (let i = 0; i < customEndpoints.length; i += 1) {
+    const endpointTemplate = customEndpoints[i];
+    try {
+      const hasPlaceholder = /\{name\}/i.test(endpointTemplate);
+      const targetUrl = hasPlaceholder
+        ? endpointTemplate.replace(/\{name\}/gi, encodeURIComponent(rawName))
+        : endpointTemplate;
+      const apiRes = await fetch(targetUrl, {
+        method: hasPlaceholder ? 'GET' : 'POST',
+        headers: hasPlaceholder
+          ? { Accept: 'application/json' }
+          : { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: hasPlaceholder ? undefined : JSON.stringify({ name: rawName }),
+        signal: AbortSignal.timeout(4000),
+      });
+      if (!apiRes.ok) continue;
+      const data = (await apiRes.json()) as {
+        logoKey?: string;
+        logoUrl?: string;
+        officialDomain?: string;
+        domain?: string;
+        category?: string;
+        planLabel?: string;
+        description?: string;
+        features?: string[];
+      };
+      const hasUsefulData = Boolean(
+        data &&
+          (data.description || data.logoUrl || data.officialDomain || data.domain || data.planLabel)
+      );
+      if (!hasUsefulData) continue;
+
+      const domain =
+        explicitDomain || normalizeDomainInput(String(data.officialDomain || data.domain || ''));
+      const logoUrl =
+        data.logoUrl?.trim() || (domain ? await pickFirstReachableLogoUrl(domain) : '');
+      const matchedCat = PRODUCT_CATEGORIES.includes(data.category as ProductCategory)
+        ? (data.category as ProductCategory)
+        : 'Productivity';
+
+      return jsonResponse({
+        logoKey: data.logoKey || resolveBrandKeyFromName(rawName),
+        logoUrl,
+        category: matchedCat,
+        planLabel: data.planLabel || '1 Month · Pro Access',
+        description:
+          data.description ||
+          `Verified ${rawName} subscription with instant WhatsApp activation.`,
+        features:
+          Array.isArray(data.features) && data.features.length > 0
+            ? data.features.slice(0, 3)
+            : ['Instant WhatsApp delivery', 'Full term warranty', 'Verified pro access'],
+        source: `custom-endpoint-${i + 1}`,
+      });
+    } catch {
+      // Try next endpoint
+    }
   }
 
   const logoKey = resolveBrandKeyFromName(rawName);
