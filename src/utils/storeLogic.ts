@@ -158,6 +158,15 @@ export function buildWhatsappOrderUrl(params: WhatsappUrlParams): string {
   return `https://wa.me/${cleanPhone}?text=${text}`;
 }
 
+export function buildWhatsappSupportUrl(
+  storeWhatsapp: string,
+  message: string
+): string {
+  const cleanPhone = sanitizeWhatsappPhone(storeWhatsapp);
+  const trimmed = message.trim() || 'Assalam o Alaikum! I need help with ToolCraft Pro Subscriptions.';
+  return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(trimmed)}`;
+}
+
 export interface OrderValidationInput {
   customerName: string;
   customerWhatsapp: string;

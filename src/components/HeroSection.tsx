@@ -8,7 +8,11 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import type { Product } from '../types';
-import { computeDiscountPercent, formatCurrency } from '../utils/storeLogic';
+import {
+  buildWhatsappSupportUrl,
+  computeDiscountPercent,
+  formatCurrency,
+} from '../utils/storeLogic';
 import { ToolLogo } from './ToolLogo';
 
 interface HeroSectionProps {
@@ -38,7 +42,10 @@ export function HeroSection({
   gatewayStripText = 'Easypaisa · Binance',
   loading = false,
 }: HeroSectionProps) {
-  const cleanWa = whatsappNumber.replace(/[^\d]/g, '');
+  const heroWhatsappUrl = buildWhatsappSupportUrl(
+    whatsappNumber,
+    'Assalam o Alaikum! I want to buy a Pro Subscription from ToolCraft. Please share details.'
+  );
 
   return (
     <section
@@ -127,7 +134,7 @@ export function HeroSection({
                 <motion.a
                   whileHover={{ y: -2 }}
                   whileTap={{ scale: 0.98 }}
-                  href={`https://wa.me/${cleanWa}`}
+                  href={heroWhatsappUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center justify-center gap-2 min-h-[50px] px-6 py-3 text-sm font-semibold text-[#065F46] bg-white border border-[#C6F6D5] rounded-xl shadow-[0_6px_18px_-8px_rgba(5,150,105,0.28)] hover:bg-[#ECFDF5] hover:border-[#6EE7B7] transition-colors duration-200 whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#059669]"
@@ -182,7 +189,7 @@ export function HeroSection({
                         Click any tool for direct WhatsApp order
                       </p>
                     </div>
-                    <span className="font-mono tabular-nums text-[11px] font-semibold text-[#34D399]">
+                    <span className="font-mono tabular-nums text-[11px] font-semibold text-[#34D399] whitespace-nowrap shrink-0">
                       15-Min Delivery
                     </span>
                   </div>

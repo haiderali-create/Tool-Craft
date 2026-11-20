@@ -1,6 +1,6 @@
-import { BadgeCheck, Lock, MessageCircle } from 'lucide-react';
+import { ArrowUp, BadgeCheck, Lock, MessageCircle } from 'lucide-react';
 import type { ProductCategory } from '../types';
-import { PRODUCT_CATEGORIES } from '../utils/storeLogic';
+import { buildWhatsappSupportUrl, PRODUCT_CATEGORIES } from '../utils/storeLogic';
 import { StoreBrandLogo } from './StoreBrandLogo';
 
 interface FooterProps {
@@ -22,7 +22,10 @@ export function Footer({
   onSelectCategory,
   onOpenAdmin,
 }: FooterProps) {
-  const cleanWa = whatsappNumber.replace(/[^\d]/g, '');
+  const footerWhatsappUrl = buildWhatsappSupportUrl(
+    whatsappNumber,
+    `Assalam o Alaikum! I need support from ${storeName} regarding Pro Subscriptions.`
+  );
 
   return (
     <footer className="relative overflow-hidden bg-[#0B0D11] text-[#D1D5DB] border-t border-white/10 pt-14 pb-5">
@@ -80,7 +83,7 @@ export function Footer({
             <p className="text-sm text-[#D1D5DB]">
               WhatsApp:{' '}
               <a
-                href={`https://wa.me/${cleanWa}`}
+                href={footerWhatsappUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-mono tabular-nums text-white hover:text-[#34D399] underline underline-offset-4 decoration-white/25 hover:decoration-[#34D399] transition-colors"
@@ -90,7 +93,7 @@ export function Footer({
             </p>
             <p className="mt-2 text-xs font-semibold text-[#34D399]">{supportHours}</p>
             <a
-              href={`https://wa.me/${cleanWa}`}
+              href={footerWhatsappUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="mt-4 inline-flex items-center gap-2 min-h-[40px] px-4 py-2 text-xs font-semibold text-white bg-white/[0.06] border border-white/15 rounded-xl hover:bg-[#059669] hover:border-[#059669] transition-all whitespace-nowrap"
@@ -102,13 +105,22 @@ export function Footer({
         </div>
 
         {/* Copyright Row */}
-        <div className="pt-6 pb-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-[#6B7280]">
+        <div className="pt-6 pb-4 pr-20 sm:pr-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs text-[#6B7280]">
           <span>
             &copy; {new Date().getFullYear()} {storeName}. All rights reserved.
           </span>
-          <span className="text-[11px] text-[#6B7280]">
-            Verified Digital Subscriptions · Instant Delivery
-          </span>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+            <span className="text-[11px] text-[#6B7280]">
+              Verified Digital Subscriptions · Instant Delivery
+            </span>
+            <a
+              href="#top"
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-[#9CA3AF] hover:text-white transition-colors whitespace-nowrap"
+            >
+              <span>Top</span>
+              <ArrowUp className="w-3 h-3" />
+            </a>
+          </div>
         </div>
 
         {/* Discreet Bottom-Most Portal Access (kept clear of bottom-right floating WhatsApp) */}

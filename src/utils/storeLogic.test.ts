@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   buildLogoCandidateUrls,
   buildWhatsappOrderUrl,
+  buildWhatsappSupportUrl,
   computeDiscountPercent,
   computeInventorySummary,
   filterAndSortProducts,
@@ -120,6 +121,23 @@ test('buildWhatsappOrderUrl includes 15-minute screenshot reminder', () => {
   const decoded = decodeURIComponent(url.split('text=')[1]);
   assert.match(decoded, /CapCut Pro/);
   assert.match(decoded, /15 minutes/);
+});
+
+test('buildWhatsappSupportUrl sanitizes phone and always includes an encoded pre-filled message', () => {
+  const customUrl = buildWhatsappSupportUrl(
+    '+92 323-4319689',
+    'Assalam-o-Alaikum Tool Craft! Mujhe CapCut Pro ki detail chahiye.'
+  );
+  assert.ok(customUrl.startsWith('https://wa.me/923234319689?text='));
+  assert.equal(
+    decodeURIComponent(customUrl.split('text=')[1]),
+    'Assalam-o-Alaikum Tool Craft! Mujhe CapCut Pro ki detail chahiye.'
+  );
+
+  const fallbackUrl = buildWhatsappSupportUrl('+92 3234319689', '   ');
+  assert.ok(fallbackUrl.startsWith('https://wa.me/923234319689?text='));
+  const decodedFallback = decodeURIComponent(fallbackUrl.split('text=')[1]);
+  assert.ok(decodedFallback.length > 10);
 });
 
 test('validateOrderInput requires uploaded payment screenshot before submit', () => {

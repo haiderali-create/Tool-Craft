@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { BadgeCheck, Menu, MessageCircle, X } from 'lucide-react';
-import { sanitizeWhatsappPhone } from '../utils/storeLogic';
+import { AnimatePresence, motion, useScroll, useSpring } from 'motion/react';
+import { buildWhatsappSupportUrl } from '../utils/storeLogic';
 import { StoreBrandLogo } from './StoreBrandLogo';
 
 interface NavbarProps {
@@ -19,9 +20,17 @@ export function Navbar({
   toolCount = 0,
 }: NavbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { scrollYProgress } = useScroll();
+  const smoothProgress = useSpring(scrollYProgress, {
+    stiffness: 220,
+    damping: 30,
+    restDelta: 0.001,
+  });
 
-  const cleanWa = sanitizeWhatsappPhone(whatsappNumber);
-  const whatsappUrl = `https://wa.me/${cleanWa}`;
+  const whatsappUrl = buildWhatsappSupportUrl(
+    whatsappNumber,
+    `Assalam o Alaikum! I visited ${storeName} and would like details about your Pro Subscriptions.`
+  );
 
   const announcementItems = [
     `${storeName} Official Pro Subscriptions`,
@@ -77,7 +86,7 @@ export function Navbar({
       </div>
 
       {/* Main 3-Zone Navigation Bar */}
-      <div className="bg-white/92 backdrop-blur-md border-b border-[#E5E8EE] shadow-[0_6px_24px_-18px_rgba(11,13,17,0.16)]">
+      <div className="relative bg-white/92 backdrop-blur-md border-b border-[#E5E8EE] shadow-[0_6px_24px_-18px_rgba(11,13,17,0.16)]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-8">
           {/* Zone 1: Brand Logo + Wordmark + Verified Sub-label */}
           <a
@@ -148,44 +157,57 @@ export function Navbar({
           </div>
         </div>
 
-        {mobileOpen && (
-          <nav
-            aria-label="Mobile navigation"
-            className="md:hidden border-t border-[#E5E8EE] bg-white px-4 py-4 space-y-1.5 shadow-lg"
-          >
-            <a
-              href="#catalog"
-              onClick={() => setMobileOpen(false)}
-              className="block py-2.5 px-3 text-sm font-medium text-[#0B0D11] rounded-lg hover:bg-[#F3F4F6]"
+        {/* Sleek Emerald Reading/Scroll Progress Bar */}
+        <motion.div
+          aria-hidden="true"
+          style={{ scaleX: smoothProgress, transformOrigin: '0% 50%' }}
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] bg-gradient-to-r from-[#059669] via-[#10B981] to-[#34D399]"
+        />
+
+        <AnimatePresence>
+          {mobileOpen && (
+            <motion.nav
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              aria-label="Mobile navigation"
+              className="md:hidden overflow-hidden border-t border-[#E5E8EE] bg-white px-4 py-4 space-y-1.5 shadow-lg"
             >
-              Catalog
-            </a>
-            <a
-              href="#categories"
-              onClick={() => setMobileOpen(false)}
-              className="block py-2.5 px-3 text-sm font-medium text-[#0B0D11] rounded-lg hover:bg-[#F3F4F6]"
-            >
-              Categories
-            </a>
-            <a
-              href="#how-it-works"
-              onClick={() => setMobileOpen(false)}
-              className="block py-2.5 px-3 text-sm font-medium text-[#0B0D11] rounded-lg hover:bg-[#F3F4F6]"
-            >
-              How It Works
-            </a>
-            <a
-              href={whatsappUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => setMobileOpen(false)}
-              className="w-full mt-2 min-h-[44px] px-4 py-2.5 inline-flex items-center justify-center gap-2 text-sm font-semibold text-white bg-[#059669] hover:bg-[#047857] rounded-xl"
-            >
-              <MessageCircle className="w-4 h-4" />
-              WhatsApp
-            </a>
-          </nav>
-        )}
+              <a
+                href="#catalog"
+                onClick={() => setMobileOpen(false)}
+                className="block py-2.5 px-3 text-sm font-medium text-[#0B0D11] rounded-lg hover:bg-[#F3F4F6]"
+              >
+                Catalog
+              </a>
+              <a
+                href="#categories"
+                onClick={() => setMobileOpen(false)}
+                className="block py-2.5 px-3 text-sm font-medium text-[#0B0D11] rounded-lg hover:bg-[#F3F4F6]"
+              >
+                Categories
+              </a>
+              <a
+                href="#how-it-works"
+                onClick={() => setMobileOpen(false)}
+                className="block py-2.5 px-3 text-sm font-medium text-[#0B0D11] rounded-lg hover:bg-[#F3F4F6]"
+              >
+                How It Works
+              </a>
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMobileOpen(false)}
+                className="w-full mt-2 min-h-[44px] px-4 py-2.5 inline-flex items-center justify-center gap-2 text-sm font-semibold text-white bg-[#059669] hover:bg-[#047857] rounded-xl"
+              >
+                <MessageCircle className="w-4 h-4" />
+                WhatsApp
+              </a>
+            </motion.nav>
+          )}
+        </AnimatePresence>
       </div>
     </header>
   );

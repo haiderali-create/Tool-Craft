@@ -1,6 +1,6 @@
 import { ArrowUpRight, Copy, Layers, MessageCircle } from 'lucide-react';
 import { motion } from 'motion/react';
-import { sanitizeWhatsappPhone } from '../utils/storeLogic';
+import { buildWhatsappSupportUrl, sanitizeWhatsappPhone } from '../utils/storeLogic';
 
 interface HowItWorksSectionProps {
   gatewayNamesText?: string;
@@ -38,7 +38,13 @@ export function HowItWorksSection({
     },
   ];
 
-  const cleanWa = whatsappNumber ? sanitizeWhatsappPhone(whatsappNumber) : '';
+  const hasWa = Boolean(whatsappNumber && sanitizeWhatsappPhone(whatsappNumber));
+  const supportWaUrl = hasWa && whatsappNumber
+    ? buildWhatsappSupportUrl(
+        whatsappNumber,
+        'Assalam o Alaikum! I need help choosing a Pro Subscription or requesting a custom tool on ToolCraft.'
+      )
+    : '';
 
   return (
     <section
@@ -64,7 +70,12 @@ export function HowItWorksSection({
           </p>
         </motion.div>
 
-        <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="relative mt-10">
+          <div
+            aria-hidden="true"
+            className="hidden md:block pointer-events-none absolute top-11 left-[16%] right-[16%] h-px bg-gradient-to-r from-[#E5E8EE] via-[#A7F3D0] to-[#E5E8EE]"
+          />
+          <div className="relative grid grid-cols-1 md:grid-cols-3 gap-6">
           {steps.map((step, idx) => {
             const Icon = step.icon;
             return (
@@ -92,9 +103,10 @@ export function HowItWorksSection({
               </motion.div>
             );
           })}
+          </div>
         </div>
 
-        {cleanWa && (
+        {hasWa && (
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -115,7 +127,7 @@ export function HowItWorksSection({
             <motion.a
               whileHover={{ y: -2 }}
               whileTap={{ scale: 0.98 }}
-              href={`https://wa.me/${cleanWa}`}
+              href={supportWaUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center gap-2 min-h-[44px] px-5 py-2.5 text-sm font-semibold text-white bg-[#059669] rounded-xl shadow-[0_10px_22px_-8px_rgba(5,150,105,0.55)] hover:bg-[#047857] transition-colors whitespace-nowrap shrink-0"

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { Search } from 'lucide-react';
+import { ChevronDown, Search, X } from 'lucide-react';
 import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 import { createDefaultSettings } from './data/defaultStoreSeed';
 import { auth } from './firebase';
@@ -295,7 +295,13 @@ export default function App() {
         {/* Catalog & Categories Section */}
         <section id="catalog" className="scroll-mt-28 py-14 sm:py-16">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-5">
+            <motion.div
+              initial={{ opacity: 0, y: 14 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.25 }}
+              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+              className="flex flex-col md:flex-row md:items-end justify-between gap-5"
+            >
               <div>
                 <p className="font-mono text-xs font-semibold uppercase tracking-[0.14em] text-[#059669]">
                   Verified Subscriptions
@@ -309,36 +315,52 @@ export default function App() {
                   AI &amp; Creative Tool Catalog
                 </h2>
                 <p className="mt-1.5 text-sm text-[#4B5563]">
-                  Click Buy Now on any tool for {activeGatewayNames} &amp; WhatsApp checkout.
+                  Click Buy Now on any tool for {activeGatewayNames} &amp; direct WhatsApp checkout.
                 </p>
               </div>
 
               <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5">
                 <div className="relative flex-1 sm:w-64">
-                  <Search className="w-4 h-4 text-[#9CA3AF] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <Search className="w-4 h-4 text-[#9CA3AF] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
-                    type="search"
+                    type="text"
                     aria-label="Search AI tools"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search Pro Subscriptions..."
-                    className="w-full min-h-[44px] pl-10 pr-3.5 py-2 text-sm bg-white border border-[#E5E8EE] rounded-xl text-[#0B0D11] shadow-[0_1px_2px_rgba(11,13,17,0.04)] placeholder:text-[#9CA3AF] focus:outline-none focus:border-[#0B0D11] focus:ring-2 focus:ring-[#0B0D11]/10 transition-all"
+                    className="w-full min-h-[44px] pl-10 pr-9 py-2 text-sm bg-white border border-[#E5E8EE] rounded-xl text-[#0B0D11] shadow-[0_1px_2px_rgba(11,13,17,0.04)] placeholder:text-[#9CA3AF] focus:outline-none focus:border-[#0B0D11] focus:ring-2 focus:ring-[#0B0D11]/10 transition-all"
                   />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      aria-label="Clear search"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 inline-flex items-center justify-center rounded-lg text-[#9CA3AF] hover:text-[#0B0D11] hover:bg-[#F3F4F6] transition-colors cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
 
-                <select
-                  aria-label="Sort products"
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as SortOption)}
-                  className="min-h-[44px] px-3.5 py-2 text-sm font-medium bg-white border border-[#E5E8EE] rounded-xl text-[#0B0D11] shadow-[0_1px_2px_rgba(11,13,17,0.04)] focus:outline-none focus:border-[#0B0D11] cursor-pointer"
-                >
-                  <option value="featured">Top Selling First</option>
-                  <option value="price-asc">Price: Low to High</option>
-                  <option value="price-desc">Price: High to Low</option>
-                  <option value="name-asc">Name: A to Z</option>
-                </select>
+                <div className="relative shrink-0">
+                  <select
+                    aria-label="Sort products"
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as SortOption)}
+                    className="appearance-none min-h-[44px] pl-3.5 pr-9 py-2 text-sm font-medium bg-white border border-[#E5E8EE] rounded-xl text-[#0B0D11] shadow-[0_1px_2px_rgba(11,13,17,0.04)] hover:border-[#C5CCD6] focus:outline-none focus:border-[#0B0D11] focus:ring-2 focus:ring-[#0B0D11]/10 transition-all cursor-pointer"
+                  >
+                    <option value="featured">Top Selling First</option>
+                    <option value="price-asc">Price: Low to High</option>
+                    <option value="price-desc">Price: High to Low</option>
+                    <option value="name-asc">Name: A to Z</option>
+                  </select>
+                  <ChevronDown
+                    aria-hidden="true"
+                    className="w-4 h-4 text-[#6B7280] pointer-events-none absolute right-3 top-1/2 -translate-y-1/2"
+                  />
+                </div>
               </div>
-            </div>
+            </motion.div>
 
             {/* Category Tabs with Smooth Sliding Active Indicator */}
             <div className="mt-6 bg-white p-1.5 rounded-2xl border border-[#E5E8EE] shadow-[0_1px_2px_rgba(11,13,17,0.04)]">
@@ -346,7 +368,7 @@ export default function App() {
                 id="categories"
                 role="tablist"
                 aria-label="Tool categories"
-                className="scroll-mt-28 flex items-center gap-1 overflow-x-auto"
+                className="scroll-mt-28 flex items-center gap-1 overflow-x-auto tc-no-scrollbar"
               >
                 {(['All', ...PRODUCT_CATEGORIES] as const).map((category) => {
                   const isActive = selectedCategory === category;
