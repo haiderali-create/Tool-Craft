@@ -49,6 +49,7 @@ import {
   filterAndSortProducts,
   formatAutoFetchSourceLabel,
   formatCurrency,
+  formatUsdAmount,
   normalizeDomainInput,
   parseApiEndpointLines,
   PRODUCT_CATEGORIES,
@@ -1301,6 +1302,9 @@ export function AdminDashboard({
                                 <>
                                   <span className="font-semibold text-[#0D0F12]">
                                     {formatCurrency(item.price, currency)}
+                                  </span>
+                                  <span className="block text-[11px] font-semibold text-[#059669]">
+                                    {formatUsdAmount(item.price)}
                                   </span>
                                   {item.originalPrice && item.originalPrice > item.price && (
                                     <span className="block text-xs text-[#8A92A0] line-through">

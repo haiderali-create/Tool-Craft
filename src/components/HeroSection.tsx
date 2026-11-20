@@ -12,6 +12,7 @@ import {
   buildWhatsappSupportUrl,
   computeDiscountPercent,
   formatCurrency,
+  formatUsdAmount,
 } from '../utils/storeLogic';
 import { ToolLogo } from './ToolLogo';
 
@@ -246,11 +247,10 @@ export function HeroSection({
                                   </span>
                                   <ArrowUpRight className="w-3.5 h-3.5 text-white/40 group-hover:text-[#34D399] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all shrink-0" />
                                 </div>
-                                {discountPct > 0 && (
-                                  <span className="block font-mono text-[10px] font-medium text-white/55">
-                                    Save {discountPct}%
-                                  </span>
-                                )}
+                                <span className="block font-mono tabular-nums text-[10.5px] font-medium text-white/65">
+                                  {formatUsdAmount(item.price)}
+                                  {discountPct > 0 ? ` · Save ${discountPct}%` : ''}
+                                </span>
                               </div>
                             </div>
                           </motion.button>
@@ -284,7 +284,8 @@ export function HeroSection({
                           <div className="min-w-0 flex-1">
                             <p className="text-xs font-bold text-white truncate">{item.name}</p>
                             <p className="text-[11px] font-mono tabular-nums text-[#34D399] truncate">
-                              {formatCurrency(item.price, currencySymbol)}
+                              {formatCurrency(item.price, currencySymbol)} ·{' '}
+                              <span className="text-white/75">{formatUsdAmount(item.price)}</span>
                             </p>
                           </div>
                           <ArrowUpRight className="w-3.5 h-3.5 text-white/35 group-hover:text-[#34D399] transition-colors shrink-0" />

@@ -1,7 +1,7 @@
 import { ArrowUpRight, Check, MessageCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import type { Product } from '../types';
-import { computeDiscountPercent, formatCurrency } from '../utils/storeLogic';
+import { computeDiscountPercent, formatCurrency, formatUsdAmount } from '../utils/storeLogic';
 import { ToolLogo } from './ToolLogo';
 
 interface ProductCardProps {
@@ -97,8 +97,11 @@ export function ProductCard({ product, currencySymbol, onBuyNow }: ProductCardPr
               )}
             </div>
           )}
-          <div className="font-mono tabular-nums text-[26px] leading-tight font-bold tracking-tight text-[#0B0D11]">
+          <div className="font-mono tabular-nums text-[25px] leading-tight font-bold tracking-tight text-[#0B0D11]">
             {formatCurrency(product.price, currencySymbol)}
+          </div>
+          <div className="mt-0.5 font-mono tabular-nums text-xs font-semibold text-[#059669]">
+            {formatUsdAmount(product.price)} USD
           </div>
         </div>
 

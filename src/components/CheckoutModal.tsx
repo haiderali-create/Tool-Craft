@@ -9,12 +9,15 @@ import {
   ShieldCheck,
   X,
 } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { motion } from 'motion/react';
 import type { GatewayId, Product, StoreSettings } from '../types';
 import {
   buildWhatsappOrderUrl,
   computeDiscountPercent,
   formatCurrency,
+  formatUsdAmount,
+  formatUsdtAmount,
+  PKR_PER_USD,
   resolveCheckoutGateways,
 } from '../utils/storeLogic';
 import { ToolLogo } from './ToolLogo';
@@ -37,14 +40,20 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
     enabledGateways.find((g) => g.id === selectedGatewayId) || enabledGateways[0];
 
   const priceText = formatCurrency(product.price, settings.currencySymbol);
+  const usdPriceText = formatUsdAmount(product.price);
+  const usdtPriceText = formatUsdtAmount(product.price);
   const discountPct = computeDiscountPercent(product.price, product.originalPrice);
   const isBinance = activeGateway?.id === 'binance';
+
+  const whatsappPriceText = isBinance
+    ? `${usdPriceText} (${usdtPriceText} / ${priceText})`
+    : `${priceText} (${usdPriceText})`;
 
   const directWhatsappUrl = buildWhatsappOrderUrl({
     storeWhatsapp: settings.whatsappNumber,
     productName: product.name,
     planLabel: product.planLabel,
-    priceText,
+    priceText: whatsappPriceText,
     paymentMethodLabel: activeGateway?.label,
   });
 
@@ -108,7 +117,7 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
               <p className="text-xs text-[#4B5563] truncate">
                 {product.planLabel} ·{' '}
                 <span className="font-mono tabular-nums font-bold text-[#059669]">
-                  {priceText}
+                  {isBinance ? `${usdPriceText} (${usdtPriceText})` : `${priceText} / ${usdPriceText}`}
                 </span>
                 {discountPct > 0 && (
                   <span className="ml-1.5 font-mono text-[11px] text-[#6B7280]">
@@ -136,13 +145,21 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
               <p className="text-sm font-semibold text-[#0B0D11]">
                 1. Send Payment via Gateway
               </p>
-              <div className="inline-flex items-center gap-1.5 font-mono tabular-nums text-xs font-bold bg-[#F6F7F9] border border-[#E5E8EE] px-2.5 py-1 rounded-lg text-[#0B0D11]">
+              <div
+                data-testid="checkout-price-badge"
+                className="inline-flex items-center gap-1.5 font-mono tabular-nums text-xs font-bold bg-[#F6F7F9] border border-[#E5E8EE] px-2.5 py-1 rounded-lg text-[#0B0D11]"
+              >
                 {product.originalPrice && product.originalPrice > product.price && (
                   <span className="text-[#9CA3AF] line-through font-normal">
-                    {formatCurrency(product.originalPrice, settings.currencySymbol)}
+                    {isBinance
+                      ? formatUsdAmount(product.originalPrice)
+                      : formatCurrency(product.originalPrice, settings.currencySymbol)}
                   </span>
                 )}
-                <span>{priceText}</span>
+                <span>{isBinance ? `${usdPriceText} (${usdtPriceText})` : priceText}</span>
+                <span className="text-[#059669] font-semibold">
+                  {isBinance ? `· ${priceText}` : `· ${usdPriceText}`}
+                </span>
               </div>
             </div>
 
@@ -178,23 +195,40 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
               })}
             </div>
 
-            <AnimatePresence mode="wait">
-              {activeGateway && (
-                <motion.div
-                  key={activeGateway.id}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.16 }}
-                  className="p-4 rounded-xl bg-[#F8F9FB] border border-[#E5E8EE] space-y-2.5"
-                >
-                  <div className="min-w-0">
-                    <span className="block text-[11px] font-medium text-[#6B7280]">
-                      Account Title
-                    </span>
-                    <span className="text-sm font-bold text-[#0B0D11] block truncate">
-                      {activeGateway.accountTitle}
-                    </span>
+            {activeGateway && (
+              <motion.div
+                key={activeGateway.id}
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.15 }}
+                className="p-4 rounded-xl bg-[#F8F9FB] border border-[#E5E8EE] space-y-2.5"
+              >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <span className="block text-[11px] font-medium text-[#6B7280]">
+                        Account Title
+                      </span>
+                      <span className="text-sm font-bold text-[#0B0D11] block truncate">
+                        {activeGateway.accountTitle}
+                      </span>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className="block text-[11px] font-medium text-[#6B7280]">
+                        {isBinance ? 'Amount to Pay (USD)' : 'Amount to Pay'}
+                      </span>
+                      <span
+                        data-testid="checkout-payable-amount"
+                        className="font-mono tabular-nums text-sm font-bold text-[#059669] block"
+                      >
+                        {isBinance ? `${usdPriceText} (${usdtPriceText})` : `${priceText} (${usdPriceText})`}
+                      </span>
+                      {isBinance && (
+                        <span className="block font-mono tabular-nums text-[10px] text-[#6B7280]">
+                          Rate: $1 = {settings.currencySymbol} {PKR_PER_USD}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="pt-2.5 border-t border-[#E5E8EE] flex items-center justify-between gap-3">
@@ -220,12 +254,11 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
                       ) : (
                         <Copy className="w-3.5 h-3.5" />
                       )}
-                      {copiedAccount ? 'Copied' : 'Copy Number'}
+                      {copiedAccount ? 'Copied' : isBinance ? 'Copy Pay ID' : 'Copy Number'}
                     </button>
                   </div>
                 </motion.div>
-              )}
-            </AnimatePresence>
+            )}
           </div>
 
           {/* 2. Direct WhatsApp Order & Screenshot Step (No Form Required) */}

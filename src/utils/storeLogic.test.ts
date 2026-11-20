@@ -6,11 +6,14 @@ import {
   buildWhatsappSupportUrl,
   computeDiscountPercent,
   computeInventorySummary,
+  convertPkrToUsd,
   filterAndSortProducts,
   formatAutoFetchSourceLabel,
   formatCurrency,
   formatEnabledGatewayNames,
+  formatUsdAmount,
   formatUsdtAmount,
+  PKR_PER_USD,
   maskApiKey,
   normalizeDomainInput,
   parseApiEndpointLines,
@@ -102,10 +105,16 @@ test('resolveBrandKeyFromName matches official AI and creative tools', () => {
   assert.equal(resolveBrandKeyFromName('Unknown Custom App'), 'generic');
 });
 
-test('formatCurrency, formatUsdtAmount, and sanitizeWhatsappPhone handle values cleanly', () => {
+test('formatCurrency, USD/USDT conversion at 270 PKR = $1, and sanitizeWhatsappPhone handle values cleanly', () => {
+  assert.equal(PKR_PER_USD, 270);
   assert.equal(formatCurrency(1850, 'Rs.'), 'Rs. 1,850');
-  assert.equal(formatUsdtAmount(950), '3.33 USDT');
-  assert.equal(formatUsdtAmount(285), '1.00 USDT');
+  assert.equal(convertPkrToUsd(300), 1.1);
+  assert.equal(formatUsdAmount(300), '$1.1');
+  assert.equal(formatUsdAmount(450), '$1.7');
+  assert.equal(formatUsdAmount(270), '$1');
+  assert.equal(formatUsdAmount(0), '$0');
+  assert.equal(formatUsdtAmount(300), '1.1 USDT');
+  assert.equal(formatUsdtAmount(270), '1 USDT');
   assert.equal(sanitizeWhatsappPhone('+92 323-4319689'), '923234319689');
 });
 

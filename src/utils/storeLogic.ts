@@ -79,12 +79,27 @@ export function formatCurrency(amount: number, currencySymbol = 'Rs.'): string {
   return `${currencySymbol} ${formatted}`;
 }
 
-export const PKR_PER_USDT = 285;
+export const PKR_PER_USD = 270;
+export const PKR_PER_USDT = PKR_PER_USD;
+
+export function convertPkrToUsd(pkrAmount: number, rate = PKR_PER_USD): number {
+  const safeAmount = Number.isFinite(pkrAmount) ? Math.max(0, pkrAmount) : 0;
+  if (safeAmount === 0) return 0;
+  const safeRate = Number.isFinite(rate) && rate > 0 ? rate : PKR_PER_USD;
+  const rounded = Math.round((safeAmount / safeRate) * 10) / 10;
+  return Math.max(0.1, rounded);
+}
+
+export function formatUsdAmount(pkrAmount: number, rate = PKR_PER_USD): string {
+  const usd = convertPkrToUsd(pkrAmount, rate);
+  const formatted = Number.isInteger(usd) ? String(usd) : usd.toFixed(1);
+  return `$${formatted}`;
+}
 
 export function formatUsdtAmount(pkrAmount: number, rate = PKR_PER_USDT): string {
-  const safeAmount = Number.isFinite(pkrAmount) ? Math.max(0, pkrAmount) : 0;
-  const safeRate = Number.isFinite(rate) && rate > 0 ? rate : PKR_PER_USDT;
-  return `${(safeAmount / safeRate).toFixed(2)} USDT`;
+  const usd = convertPkrToUsd(pkrAmount, rate);
+  const formatted = Number.isInteger(usd) ? String(usd) : usd.toFixed(1);
+  return `${formatted} USDT`;
 }
 
 export function computeDiscountPercent(price: number, originalPrice?: number): number {
