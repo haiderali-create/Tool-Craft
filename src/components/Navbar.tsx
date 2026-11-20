@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Menu, MessageCircle, X } from 'lucide-react';
+import { BadgeCheck, Menu, MessageCircle, X } from 'lucide-react';
 import { sanitizeWhatsappPhone } from '../utils/storeLogic';
 import { StoreBrandLogo } from './StoreBrandLogo';
 
@@ -43,11 +43,15 @@ export function Navbar({
       >
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 left-0 w-10 sm:w-16 bg-gradient-to-r from-[#0B0D11] to-transparent z-10"
+          className="pointer-events-none absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#10B981]/80 to-transparent z-20"
         />
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 right-0 w-10 sm:w-16 bg-gradient-to-l from-[#0B0D11] to-transparent z-10"
+          className="pointer-events-none absolute inset-y-0 left-0 w-12 sm:w-20 bg-gradient-to-r from-[#0B0D11] via-[#0B0D11]/85 to-transparent z-10"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 right-0 w-12 sm:w-20 bg-gradient-to-l from-[#0B0D11] via-[#0B0D11]/85 to-transparent z-10"
         />
         <div data-testid="header-marquee" className="tc-marquee-track">
           {[0, 1].map((dupIndex) => (
@@ -59,10 +63,10 @@ export function Navbar({
               {announcementItems.map((item, idx) => (
                 <span
                   key={`${dupIndex}-${idx}`}
-                  className="inline-flex items-center text-[11px] sm:text-xs font-medium tracking-[0.015em] text-[#E5E7EB] whitespace-nowrap"
+                  className="inline-flex items-center text-[11px] sm:text-xs font-medium tracking-[0.02em] text-[#F3F4F6]/90 whitespace-nowrap"
                 >
-                  <span className="px-4 sm:px-6">{item}</span>
-                  <span aria-hidden="true" className="text-[#10B981]/85 text-[10px]">
+                  <span className="px-5 sm:px-7">{item}</span>
+                  <span aria-hidden="true" className="text-[#34D399] text-[10px]">
                     ✦
                   </span>
                 </span>
@@ -73,37 +77,48 @@ export function Navbar({
       </div>
 
       {/* Main 3-Zone Navigation Bar */}
-      <div className="bg-white/90 backdrop-blur-md border-b border-[#E5E8EE] shadow-[0_1px_0_rgba(11,13,17,0.02)]">
+      <div className="bg-white/92 backdrop-blur-md border-b border-[#E5E8EE] shadow-[0_6px_24px_-18px_rgba(11,13,17,0.16)]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-8">
-          {/* Zone 1: Brand Logo + Wordmark */}
+          {/* Zone 1: Brand Logo + Wordmark + Verified Sub-label */}
           <a
             href="#top"
-            className="inline-flex items-center gap-2.5 font-display text-xl font-bold tracking-tight text-[#0B0D11] whitespace-nowrap shrink-0"
+            data-testid="brand-lockup"
+            className="group inline-flex items-center gap-2.5 whitespace-nowrap shrink-0"
           >
-            <StoreBrandLogo size="md" />
-            <span>{storeName}</span>
+            <span className="transition-transform duration-200 group-hover:scale-105 inline-flex">
+              <StoreBrandLogo size="md" />
+            </span>
+            <span className="flex flex-col leading-none">
+              <span className="font-display text-[19px] font-bold tracking-tight text-[#0B0D11]">
+                {storeName}
+              </span>
+              <span className="mt-0.5 inline-flex items-center gap-1 text-[10.5px] font-semibold tracking-[0.02em] text-[#059669]">
+                <BadgeCheck className="w-3.5 h-3.5 text-[#059669] shrink-0" aria-hidden="true" />
+                <span>Verified</span>
+              </span>
+            </span>
           </a>
 
           {/* Zone 2: Concise single-line navigation links */}
           <nav
             aria-label="Primary navigation"
-            className="hidden md:flex items-center gap-8 text-sm font-medium text-[#4B5563]"
+            className="hidden md:flex items-center gap-9 text-sm font-semibold text-[#4B5563]"
           >
             <a
               href="#catalog"
-              className="relative py-1 hover:text-[#0B0D11] transition-colors whitespace-nowrap shrink-0 after:content-[''] after:absolute after:left-0 after:bottom-0 after:h-[1.5px] after:w-0 after:bg-[#0B0D11] hover:after:w-full after:transition-all after:duration-200"
+              className="relative py-1 hover:text-[#0B0D11] transition-colors whitespace-nowrap shrink-0 after:content-[''] after:absolute after:left-0 after:bottom-0 after:h-[2px] after:w-0 after:rounded-full after:bg-[#059669] hover:after:w-full after:transition-all after:duration-200"
             >
               Catalog
             </a>
             <a
               href="#categories"
-              className="relative py-1 hover:text-[#0B0D11] transition-colors whitespace-nowrap shrink-0 after:content-[''] after:absolute after:left-0 after:bottom-0 after:h-[1.5px] after:w-0 after:bg-[#0B0D11] hover:after:w-full after:transition-all after:duration-200"
+              className="relative py-1 hover:text-[#0B0D11] transition-colors whitespace-nowrap shrink-0 after:content-[''] after:absolute after:left-0 after:bottom-0 after:h-[2px] after:w-0 after:rounded-full after:bg-[#059669] hover:after:w-full after:transition-all after:duration-200"
             >
               Categories
             </a>
             <a
               href="#how-it-works"
-              className="relative py-1 hover:text-[#0B0D11] transition-colors whitespace-nowrap shrink-0 after:content-[''] after:absolute after:left-0 after:bottom-0 after:h-[1.5px] after:w-0 after:bg-[#0B0D11] hover:after:w-full after:transition-all after:duration-200"
+              className="relative py-1 hover:text-[#0B0D11] transition-colors whitespace-nowrap shrink-0 after:content-[''] after:absolute after:left-0 after:bottom-0 after:h-[2px] after:w-0 after:rounded-full after:bg-[#059669] hover:after:w-full after:transition-all after:duration-200"
             >
               How It Works
             </a>
@@ -115,7 +130,7 @@ export function Navbar({
               href={whatsappUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 min-h-[40px] text-xs sm:text-sm font-semibold text-white bg-[#059669] rounded-xl shadow-[0_6px_16px_-6px_rgba(5,150,105,0.55)] hover:bg-[#047857] hover:-translate-y-[1px] transition-all duration-150 whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#059669]"
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 min-h-[40px] text-xs sm:text-sm font-semibold text-white bg-[#059669] rounded-xl shadow-[0_8px_20px_-8px_rgba(5,150,105,0.65)] hover:bg-[#047857] hover:-translate-y-[1px] active:translate-y-0 transition-all duration-150 whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#059669]"
             >
               <MessageCircle className="w-4 h-4" />
               WhatsApp

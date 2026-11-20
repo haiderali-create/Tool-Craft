@@ -28,6 +28,7 @@ import { Footer } from './components/Footer';
 import { CheckoutModal } from './components/CheckoutModal';
 import { type AdminAuthMode, AdminLoginModal } from './components/AdminLoginModal';
 import { AdminDashboard } from './components/AdminDashboard';
+import { FloatingWhatsAppButton } from './components/FloatingWhatsAppButton';
 
 const DEFAULT_SETTINGS: StoreSettings = createDefaultSettings();
 
@@ -227,6 +228,7 @@ export default function App() {
       .join(' · ') || 'Easypaisa · Binance';
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="min-h-screen flex flex-col bg-[#F6F7F9] text-[#0B0D11]">
       {loading && !initialSnapshot ? (
         <>
@@ -297,6 +299,11 @@ export default function App() {
               <div>
                 <p className="font-mono text-xs font-semibold uppercase tracking-[0.14em] text-[#059669]">
                   Verified Subscriptions
+                  {products.length > 0 && (
+                    <span className="ml-2 font-normal text-[#6B7280] normal-case tracking-normal tabular-nums">
+                      · Showing {visibleProducts.length} of {products.length}
+                    </span>
+                  )}
                 </p>
                 <h2 className="mt-1.5 font-display text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-[#0B0D11]">
                   AI &amp; Creative Tool Catalog
@@ -333,7 +340,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Category Tabs */}
+            {/* Category Tabs with Smooth Sliding Active Indicator */}
             <div className="mt-6 bg-white p-1.5 rounded-2xl border border-[#E5E8EE] shadow-[0_1px_2px_rgba(11,13,17,0.04)]">
               <div
                 id="categories"
@@ -341,41 +348,39 @@ export default function App() {
                 aria-label="Tool categories"
                 className="scroll-mt-28 flex items-center gap-1 overflow-x-auto"
               >
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={selectedCategory === 'All'}
-                  onClick={() => setSelectedCategory('All')}
-                  className={`min-h-[40px] px-4 py-2 text-xs sm:text-sm font-semibold rounded-xl transition-all whitespace-nowrap shrink-0 cursor-pointer ${
-                    selectedCategory === 'All'
-                      ? 'bg-[#0B0D11] text-white shadow-[0_6px_14px_-6px_rgba(11,13,17,0.45)]'
-                      : 'bg-transparent text-[#4B5563] hover:text-[#0B0D11] hover:bg-[#F6F7F9]'
-                  }`}
-                >
-                  All Tools
-                </button>
-
-                {PRODUCT_CATEGORIES.map((category) => (
-                  <button
-                    key={category}
-                    type="button"
-                    role="tab"
-                    aria-selected={selectedCategory === category}
-                    onClick={() => setSelectedCategory(category)}
-                    className={`min-h-[40px] px-4 py-2 text-xs sm:text-sm font-semibold rounded-xl transition-all whitespace-nowrap shrink-0 cursor-pointer ${
-                      selectedCategory === category
-                        ? 'bg-[#0B0D11] text-white shadow-[0_6px_14px_-6px_rgba(11,13,17,0.45)]'
-                        : 'bg-transparent text-[#4B5563] hover:text-[#0B0D11] hover:bg-[#F6F7F9]'
-                    }`}
-                  >
-                    {category}
-                  </button>
-                ))}
+                {(['All', ...PRODUCT_CATEGORIES] as const).map((category) => {
+                  const isActive = selectedCategory === category;
+                  return (
+                    <button
+                      key={category}
+                      type="button"
+                      role="tab"
+                      aria-selected={isActive}
+                      onClick={() => setSelectedCategory(category)}
+                      className={`relative min-h-[40px] px-4 py-2 text-xs sm:text-sm font-semibold rounded-xl transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                        isActive
+                          ? 'text-white'
+                          : 'text-[#4B5563] hover:text-[#0B0D11] hover:bg-[#F6F7F9]'
+                      }`}
+                    >
+                      {isActive && (
+                        <motion.span
+                          layoutId="active-category-pill"
+                          transition={{ type: 'spring', stiffness: 460, damping: 34 }}
+                          className="absolute inset-0 rounded-xl bg-[#0B0D11] shadow-[0_6px_14px_-6px_rgba(11,13,17,0.45)]"
+                        />
+                      )}
+                      <span className="relative z-10">
+                        {category === 'All' ? 'All Tools' : category}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
             {/* Product Grid */}
-            <MotionConfig reducedMotion="user">
+            <>
               {loading ? (
                 <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {[1, 2, 3].map((idx) => (
@@ -450,11 +455,16 @@ export default function App() {
                   </AnimatePresence>
                 </motion.div>
               )}
-            </MotionConfig>
+            </>
           </div>
         </section>
 
-        <HowItWorksSection gatewayNamesText={activeGatewayNames} />
+        <HowItWorksSection
+          gatewayNamesText={activeGatewayNames}
+          whatsappNumber={settings.whatsappNumber}
+          whatsappDisplay={settings.whatsappDisplay}
+          supportHours={settings.supportHours}
+        />
           </main>
 
           <Footer
@@ -466,26 +476,40 @@ export default function App() {
             onSelectCategory={(cat) => setSelectedCategory(cat)}
             onOpenAdmin={handleOpenAdmin}
           />
+
+          <FloatingWhatsAppButton
+            whatsappNumber={settings.whatsappNumber}
+            storeName={settings.storeName}
+          />
         </>
       )}
 
-      {checkoutProduct && (
-        <CheckoutModal
-          product={checkoutProduct}
-          settings={settings}
-          onClose={() => setCheckoutProduct(null)}
-        />
-      )}
+      <AnimatePresence>
+        {checkoutProduct && (
+          <CheckoutModal
+            key={checkoutProduct.id}
+            product={checkoutProduct}
+            settings={settings}
+            onClose={() => setCheckoutProduct(null)}
+          />
+        )}
+      </AnimatePresence>
 
-      <AdminLoginModal
-        open={adminLoginOpen}
-        onClose={() => setAdminLoginOpen(false)}
-        onSuccess={(username, token, mode) => {
-          saveAdminSession(username, token, mode);
-          setAdminLoginOpen(false);
-          setViewMode('admin');
-        }}
-      />
+      <AnimatePresence>
+        {adminLoginOpen && (
+          <AdminLoginModal
+            key="portal-login-modal"
+            open={adminLoginOpen}
+            onClose={() => setAdminLoginOpen(false)}
+            onSuccess={(username, token, mode) => {
+              saveAdminSession(username, token, mode);
+              setAdminLoginOpen(false);
+              setViewMode('admin');
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
+    </MotionConfig>
   );
 }

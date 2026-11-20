@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Eye, EyeOff, X } from 'lucide-react';
+import { motion } from 'motion/react';
 import {
   BOOTSTRAPPED_ADMIN_EMAIL,
   signInAdminWithEmailPassword,
@@ -90,13 +91,26 @@ export function AdminLoginModal({ open, onClose, onSuccess }: AdminLoginModalPro
   };
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.16 }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
       className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B0D11]/70 p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="portal-login-title"
     >
-      <div className="w-full max-w-sm bg-white rounded-2xl border border-[#E5E8EE] shadow-[0_30px_70px_-20px_rgba(11,13,17,0.45)] overflow-hidden">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 8 }}
+        transition={{ type: 'spring', stiffness: 440, damping: 32 }}
+        className="w-full max-w-sm bg-white rounded-2xl border border-[#E5E8EE] shadow-[0_30px_70px_-20px_rgba(11,13,17,0.45)] overflow-hidden"
+      >
         <div className="px-5 py-4 border-b border-[#E5E8EE] flex items-center justify-between bg-[#FAFBFC]">
           <div className="flex items-center gap-2.5">
             <StoreBrandLogo size="sm" />
@@ -183,7 +197,7 @@ export function AdminLoginModal({ open, onClose, onSuccess }: AdminLoginModalPro
             {loading ? 'Signing In...' : 'Continue to Portal'}
           </button>
         </form>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

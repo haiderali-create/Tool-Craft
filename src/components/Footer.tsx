@@ -1,4 +1,4 @@
-import { Lock, MessageCircle } from 'lucide-react';
+import { BadgeCheck, Lock, MessageCircle } from 'lucide-react';
 import type { ProductCategory } from '../types';
 import { PRODUCT_CATEGORIES } from '../utils/storeLogic';
 import { StoreBrandLogo } from './StoreBrandLogo';
@@ -25,17 +25,31 @@ export function Footer({
   const cleanWa = whatsappNumber.replace(/[^\d]/g, '');
 
   return (
-    <footer className="bg-[#0B0D11] text-[#D1D5DB] border-t border-white/10 pt-14 pb-5">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <footer className="relative overflow-hidden bg-[#0B0D11] text-[#D1D5DB] border-t border-white/10 pt-14 pb-5">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#10B981]/50 to-transparent"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[540px] h-48 bg-[radial-gradient(ellipse_at_center,rgba(5,150,105,0.12),transparent_70%)]"
+      />
+      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10 pb-10 border-b border-white/10">
           <div>
             <div className="inline-flex items-center gap-2.5">
               <span className="rounded-lg ring-1 ring-white/15 inline-flex">
                 <StoreBrandLogo size="sm" />
               </span>
-              <p className="font-display text-lg font-bold tracking-tight text-white">
-                {storeName}
-              </p>
+              <div className="flex flex-col leading-none">
+                <p className="font-display text-lg font-bold tracking-tight text-white">
+                  {storeName}
+                </p>
+                <span className="mt-0.5 inline-flex items-center gap-1 text-[10.5px] font-semibold tracking-[0.02em] text-[#34D399]">
+                  <BadgeCheck className="w-3.5 h-3.5 text-[#34D399] shrink-0" aria-hidden="true" />
+                  <span>Verified</span>
+                </span>
+              </div>
             </div>
             <p className="mt-3 text-sm text-[#9CA3AF] max-w-xs leading-relaxed">{tagline}</p>
           </div>
@@ -97,8 +111,8 @@ export function Footer({
           </span>
         </div>
 
-        {/* Discreet Bottom-Most Portal Access */}
-        <div className="pt-3 border-t border-white/[0.05] flex justify-center sm:justify-end">
+        {/* Discreet Bottom-Most Portal Access (kept clear of bottom-right floating WhatsApp) */}
+        <div className="pt-3 border-t border-white/[0.05] flex justify-start">
           <button
             type="button"
             data-testid="footer-portal-trigger"
