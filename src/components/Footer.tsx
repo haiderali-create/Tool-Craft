@@ -1,4 +1,4 @@
-import { Lock } from 'lucide-react';
+import { Lock, MessageCircle } from 'lucide-react';
 import type { ProductCategory } from '../types';
 import { PRODUCT_CATEGORIES } from '../utils/storeLogic';
 import { StoreBrandLogo } from './StoreBrandLogo';
@@ -25,26 +25,32 @@ export function Footer({
   const cleanWa = whatsappNumber.replace(/[^\d]/g, '');
 
   return (
-    <footer className="bg-[#F8F9FA] border-t border-[#E4E6EB] py-12">
+    <footer className="bg-[#0B0D11] text-[#D1D5DB] border-t border-white/10 pt-14 pb-5">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pb-8 border-b border-[#E4E6EB]">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-10 pb-10 border-b border-white/10">
           <div>
             <div className="inline-flex items-center gap-2.5">
-              <StoreBrandLogo size="sm" />
-              <p className="font-display text-lg font-bold text-[#111214]">{storeName}</p>
+              <span className="rounded-lg ring-1 ring-white/15 inline-flex">
+                <StoreBrandLogo size="sm" />
+              </span>
+              <p className="font-display text-lg font-bold tracking-tight text-white">
+                {storeName}
+              </p>
             </div>
-            <p className="mt-2 text-sm text-[#525866] max-w-xs leading-relaxed">{tagline}</p>
+            <p className="mt-3 text-sm text-[#9CA3AF] max-w-xs leading-relaxed">{tagline}</p>
           </div>
 
           <div>
-            <p className="text-xs font-semibold text-[#111214] mb-3">Categories</p>
-            <ul className="space-y-2 text-sm text-[#525866]">
+            <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-[#9CA3AF] mb-3.5">
+              Categories
+            </p>
+            <ul className="space-y-2.5 text-sm text-[#D1D5DB]">
               {PRODUCT_CATEGORIES.map((cat) => (
                 <li key={cat}>
                   <a
                     href="#catalog"
                     onClick={() => onSelectCategory(cat)}
-                    className="hover:text-[#111214] transition-colors"
+                    className="hover:text-white transition-colors"
                   >
                     {cat}
                   </a>
@@ -54,37 +60,55 @@ export function Footer({
           </div>
 
           <div>
-            <p className="text-xs font-semibold text-[#111214] mb-3">Direct Support</p>
-            <p className="text-sm text-[#525866]">
+            <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-[#9CA3AF] mb-3.5">
+              Direct Support
+            </p>
+            <p className="text-sm text-[#D1D5DB]">
               WhatsApp:{' '}
               <a
                 href={`https://wa.me/${cleanWa}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-mono text-[#111214] hover:text-[#059669] underline underline-offset-4"
+                className="font-mono tabular-nums text-white hover:text-[#34D399] underline underline-offset-4 decoration-white/25 hover:decoration-[#34D399] transition-colors"
               >
                 {whatsappDisplay}
               </a>
             </p>
-            <p className="mt-2 text-xs font-semibold text-[#059669]">{supportHours}</p>
+            <p className="mt-2 text-xs font-semibold text-[#34D399]">{supportHours}</p>
+            <a
+              href={`https://wa.me/${cleanWa}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 inline-flex items-center gap-2 min-h-[40px] px-4 py-2 text-xs font-semibold text-white bg-white/[0.06] border border-white/15 rounded-xl hover:bg-[#059669] hover:border-[#059669] transition-all whitespace-nowrap"
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+              Chat on WhatsApp
+            </a>
           </div>
         </div>
 
-        {/* Bottom Copyright & Discreet Hidden Admin Trigger */}
-        <div className="pt-6 flex items-center justify-between gap-4 text-xs text-[#8A92A0]">
+        {/* Copyright Row */}
+        <div className="pt-6 pb-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-[#6B7280]">
           <span>
             &copy; {new Date().getFullYear()} {storeName}. All rights reserved.
           </span>
+          <span className="text-[11px] text-[#6B7280]">
+            Verified Digital Subscriptions · Instant Delivery
+          </span>
+        </div>
 
+        {/* Discreet Bottom-Most Portal Access */}
+        <div className="pt-3 border-t border-white/[0.05] flex justify-center sm:justify-end">
           <button
             type="button"
+            data-testid="footer-portal-trigger"
             onClick={onOpenAdmin}
-            aria-label="Admin Portal"
-            title="Admin Portal (Ctrl+Shift+A)"
-            className="inline-flex items-center gap-1.5 px-2 py-1.5 rounded text-[#B4BAC5] hover:text-[#525866] transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-[#111214]"
+            aria-label="Portal"
+            title="Portal"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] tracking-wide text-white/20 hover:text-white/55 transition-colors cursor-pointer focus-visible:outline-1 focus-visible:outline-white/40"
           >
-            <Lock className="w-3.5 h-3.5" />
-            <span className="text-[11px]">Portal</span>
+            <Lock className="w-2.5 h-2.5" aria-hidden="true" />
+            <span>Portal</span>
           </button>
         </div>
       </div>

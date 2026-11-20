@@ -896,8 +896,8 @@ export function AdminDashboard({
           </button>
           <div className="flex items-center gap-2 min-w-0">
             <StoreBrandLogo size="sm" />
-            <span className="text-sm font-semibold text-[#0D0F12] truncate">
-              Admin Portal · {username}
+            <span className="text-sm font-semibold text-[#0B0D11] truncate">
+              Portal · {username}
             </span>
           </div>
         </div>

@@ -227,41 +227,40 @@ export default function App() {
       .join(' · ') || 'Easypaisa · Binance';
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F4F5F7] text-[#0D0F12]">
+    <div className="min-h-screen flex flex-col bg-[#F6F7F9] text-[#0B0D11]">
       {loading && !initialSnapshot ? (
         <>
-          <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-[#E2E5EA]">
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-              <div className="h-7 w-32 rounded-md bg-[#E2E5EA] animate-pulse" />
-              <div className="h-9 w-28 rounded-lg bg-[#E2E5EA] animate-pulse" />
+          <header className="sticky top-0 z-30">
+            <div className="h-9 bg-[#0B0D11] border-b border-white/10" />
+            <div className="bg-white/95 backdrop-blur-md border-b border-[#E5E8EE]">
+              <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+                <div className="h-7 w-32 rounded-lg bg-[#E5E8EE] animate-pulse" />
+                <div className="h-10 w-32 rounded-xl bg-[#E5E8EE] animate-pulse" />
+              </div>
             </div>
           </header>
 
           <main className="flex-1">
-            <section className="pt-8 pb-10 sm:pt-12 sm:pb-12 bg-white border-b border-[#E2E5EA]">
-              <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            <section className="pt-10 pb-12 sm:pt-16 sm:pb-16 bg-white border-b border-[#E5E8EE]">
+              <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
                 <div className="lg:col-span-7 space-y-4">
-                  <div className="h-4 w-48 rounded bg-[#E2E5EA] animate-pulse" />
-                  <div className="h-12 w-3/4 rounded-lg bg-[#E2E5EA] animate-pulse" />
-                  <div className="h-5 w-2/3 rounded bg-[#F4F5F7] animate-pulse" />
+                  <div className="h-4 w-52 rounded bg-[#E5E8EE] animate-pulse" />
+                  <div className="h-14 w-3/4 rounded-xl bg-[#E5E8EE] animate-pulse" />
+                  <div className="h-5 w-2/3 rounded bg-[#F6F7F9] animate-pulse" />
                   <div className="flex gap-3 pt-2">
-                    <div className="h-11 w-36 rounded-lg bg-[#E2E5EA] animate-pulse" />
-                    <div className="h-11 w-44 rounded-lg bg-[#F4F5F7] animate-pulse" />
+                    <div className="h-12 w-36 rounded-xl bg-[#E5E8EE] animate-pulse" />
+                    <div className="h-12 w-44 rounded-xl bg-[#F6F7F9] animate-pulse" />
                   </div>
                 </div>
-                <div className="lg:col-span-5 grid grid-cols-2 gap-3">
-                  {[1, 2, 3, 4].map((n) => (
-                    <div key={n} className="h-16 rounded-xl bg-[#F4F5F7] border border-[#E2E5EA] animate-pulse" />
-                  ))}
-                </div>
+                <div className="lg:col-span-5 h-60 rounded-2xl bg-[#0B0D11]/90 animate-pulse" />
               </div>
             </section>
-            <section className="py-10 sm:py-12">
-              <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <section className="py-14 sm:py-16">
+              <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {[1, 2, 3, 4, 5, 6].map((idx) => (
                   <div
                     key={idx}
-                    className="h-72 bg-white border border-[#E2E5EA] rounded-xl animate-pulse"
+                    className="h-72 bg-white border border-[#E5E8EE] rounded-2xl animate-pulse"
                   />
                 ))}
               </div>
@@ -273,6 +272,9 @@ export default function App() {
           <Navbar
             storeName={settings.storeName}
             whatsappNumber={settings.whatsappNumber}
+            gatewayNamesText={activeGatewayNames}
+            supportHours={settings.supportHours}
+            toolCount={products.length}
           />
 
           <main className="flex-1">
@@ -280,6 +282,7 @@ export default function App() {
               tagline={settings.tagline}
               whatsappDisplay={settings.whatsappDisplay}
               whatsappNumber={settings.whatsappNumber}
+              currencySymbol={settings.currencySymbol}
               toolCount={products.length}
               heroProducts={heroProducts}
               onSelectProduct={(p) => setCheckoutProduct(p)}
@@ -288,28 +291,31 @@ export default function App() {
             />
 
         {/* Catalog & Categories Section */}
-        <section id="catalog" className="py-10 sm:py-12">
+        <section id="catalog" className="scroll-mt-28 py-14 sm:py-16">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-5">
               <div>
-                <h2 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-[#0D0F12]">
+                <p className="font-mono text-xs font-semibold uppercase tracking-[0.14em] text-[#059669]">
+                  Verified Subscriptions
+                </p>
+                <h2 className="mt-1.5 font-display text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-[#0B0D11]">
                   AI &amp; Creative Tool Catalog
                 </h2>
-                <p className="mt-1 text-sm text-[#525866]">
+                <p className="mt-1.5 text-sm text-[#4B5563]">
                   Click Buy Now on any tool for {activeGatewayNames} &amp; WhatsApp checkout.
                 </p>
               </div>
 
               <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5">
                 <div className="relative flex-1 sm:w-64">
-                  <Search className="w-4 h-4 text-[#8A92A0] absolute left-3 top-1/2 -translate-y-1/2" />
+                  <Search className="w-4 h-4 text-[#9CA3AF] absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="search"
                     aria-label="Search AI tools"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search Pro Subscriptions..."
-                    className="w-full min-h-[42px] pl-9 pr-3 py-2 text-sm bg-white border border-[#E2E5EA] rounded-lg text-[#0D0F12] focus:outline-none focus:border-[#0D0F12]"
+                    className="w-full min-h-[44px] pl-10 pr-3.5 py-2 text-sm bg-white border border-[#E5E8EE] rounded-xl text-[#0B0D11] shadow-[0_1px_2px_rgba(11,13,17,0.04)] placeholder:text-[#9CA3AF] focus:outline-none focus:border-[#0B0D11] focus:ring-2 focus:ring-[#0B0D11]/10 transition-all"
                   />
                 </div>
 
@@ -317,7 +323,7 @@ export default function App() {
                   aria-label="Sort products"
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as SortOption)}
-                  className="min-h-[42px] px-3 py-2 text-sm bg-white border border-[#E2E5EA] rounded-lg text-[#0D0F12] cursor-pointer"
+                  className="min-h-[44px] px-3.5 py-2 text-sm font-medium bg-white border border-[#E5E8EE] rounded-xl text-[#0B0D11] shadow-[0_1px_2px_rgba(11,13,17,0.04)] focus:outline-none focus:border-[#0B0D11] cursor-pointer"
                 >
                   <option value="featured">Top Selling First</option>
                   <option value="price-asc">Price: Low to High</option>
@@ -328,62 +334,64 @@ export default function App() {
             </div>
 
             {/* Category Tabs */}
-            <div
-              id="categories"
-              role="tablist"
-              aria-label="Tool categories"
-              className="mt-5 flex items-center gap-1.5 overflow-x-auto pb-2"
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={selectedCategory === 'All'}
-                onClick={() => setSelectedCategory('All')}
-                className={`min-h-[40px] px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                  selectedCategory === 'All'
-                    ? 'bg-[#0D0F12] text-white'
-                    : 'bg-white text-[#525866] border border-[#E2E5EA] hover:text-[#0D0F12]'
-                }`}
+            <div className="mt-6 bg-white p-1.5 rounded-2xl border border-[#E5E8EE] shadow-[0_1px_2px_rgba(11,13,17,0.04)]">
+              <div
+                id="categories"
+                role="tablist"
+                aria-label="Tool categories"
+                className="scroll-mt-28 flex items-center gap-1 overflow-x-auto"
               >
-                All Tools
-              </button>
-
-              {PRODUCT_CATEGORIES.map((category) => (
                 <button
-                  key={category}
                   type="button"
                   role="tab"
-                  aria-selected={selectedCategory === category}
-                  onClick={() => setSelectedCategory(category)}
-                  className={`min-h-[40px] px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                    selectedCategory === category
-                      ? 'bg-[#0D0F12] text-white'
-                      : 'bg-white text-[#525866] border border-[#E2E5EA] hover:text-[#0D0F12]'
+                  aria-selected={selectedCategory === 'All'}
+                  onClick={() => setSelectedCategory('All')}
+                  className={`min-h-[40px] px-4 py-2 text-xs sm:text-sm font-semibold rounded-xl transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                    selectedCategory === 'All'
+                      ? 'bg-[#0B0D11] text-white shadow-[0_6px_14px_-6px_rgba(11,13,17,0.45)]'
+                      : 'bg-transparent text-[#4B5563] hover:text-[#0B0D11] hover:bg-[#F6F7F9]'
                   }`}
                 >
-                  {category}
+                  All Tools
                 </button>
-              ))}
+
+                {PRODUCT_CATEGORIES.map((category) => (
+                  <button
+                    key={category}
+                    type="button"
+                    role="tab"
+                    aria-selected={selectedCategory === category}
+                    onClick={() => setSelectedCategory(category)}
+                    className={`min-h-[40px] px-4 py-2 text-xs sm:text-sm font-semibold rounded-xl transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                      selectedCategory === category
+                        ? 'bg-[#0B0D11] text-white shadow-[0_6px_14px_-6px_rgba(11,13,17,0.45)]'
+                        : 'bg-transparent text-[#4B5563] hover:text-[#0B0D11] hover:bg-[#F6F7F9]'
+                    }`}
+                  >
+                    {category}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Product Grid */}
             <MotionConfig reducedMotion="user">
               {loading ? (
-                <div className="mt-7 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {[1, 2, 3].map((idx) => (
                     <div
                       key={idx}
-                      className="h-72 bg-white border border-[#E2E5EA] rounded-xl animate-pulse"
+                      className="h-72 bg-white border border-[#E5E8EE] rounded-2xl animate-pulse"
                     />
                   ))}
                 </div>
               ) : loadError ? (
-                <div className="mt-7 p-8 bg-white border border-[#E2E5EA] rounded-xl text-center space-y-3">
+                <div className="mt-8 p-10 bg-white border border-[#E5E8EE] rounded-2xl text-center space-y-3 shadow-[0_2px_10px_-4px_rgba(11,13,17,0.05)]">
                   <p className="text-sm text-[#DC2626]">{loadError}</p>
                   <button
                     type="button"
                     onClick={fetchStorefront}
-                    className="px-4 py-2 text-xs font-semibold text-white bg-[#0D0F12] rounded-lg cursor-pointer"
+                    className="min-h-[40px] px-5 py-2 text-xs font-semibold text-white bg-[#0B0D11] rounded-xl hover:bg-[#1F242D] transition-colors cursor-pointer"
                   >
                     Retry
                   </button>
@@ -394,9 +402,9 @@ export default function App() {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.2 }}
-                  className="mt-7 p-10 bg-white border border-[#E2E5EA] rounded-xl text-center space-y-3"
+                  className="mt-8 p-12 bg-white border border-[#E5E8EE] rounded-2xl text-center space-y-3.5 shadow-[0_2px_10px_-4px_rgba(11,13,17,0.05)]"
                 >
-                  <p className="text-sm text-[#525866]">
+                  <p className="text-sm text-[#4B5563]">
                     No AI tools found matching your filter.
                   </p>
                   <button
@@ -405,7 +413,7 @@ export default function App() {
                       setSelectedCategory('All');
                       setSearchQuery('');
                     }}
-                    className="px-4 py-2 text-xs font-semibold text-white bg-[#0D0F12] rounded-lg cursor-pointer"
+                    className="min-h-[40px] px-5 py-2 text-xs font-semibold text-white bg-[#0B0D11] rounded-xl hover:bg-[#1F242D] transition-colors cursor-pointer"
                   >
                     Reset Filters
                   </button>
@@ -414,7 +422,7 @@ export default function App() {
                 <motion.div
                   layout
                   data-testid="product-grid"
-                  className="mt-7 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"
+                  className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
                 >
                   <AnimatePresence initial={false}>
                     {visibleProducts.map((product) => (

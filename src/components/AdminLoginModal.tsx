@@ -91,24 +91,24 @@ export function AdminLoginModal({ open, onClose, onSuccess }: AdminLoginModalPro
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#111214]/65 backdrop-blur-[2px] p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B0D11]/70 p-4"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="admin-login-title"
+      aria-labelledby="portal-login-title"
     >
-      <div className="w-full max-w-sm bg-white rounded-xl border border-[#E4E6EB] shadow-2xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-[#E4E6EB] flex items-center justify-between">
+      <div className="w-full max-w-sm bg-white rounded-2xl border border-[#E5E8EE] shadow-[0_30px_70px_-20px_rgba(11,13,17,0.45)] overflow-hidden">
+        <div className="px-5 py-4 border-b border-[#E5E8EE] flex items-center justify-between bg-[#FAFBFC]">
           <div className="flex items-center gap-2.5">
             <StoreBrandLogo size="sm" />
-            <h2 id="admin-login-title" className="font-display text-base font-bold text-[#111214]">
-              Admin Portal Sign In
+            <h2 id="portal-login-title" className="font-display text-base font-bold text-[#0B0D11]">
+              Portal Sign In
             </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close admin login"
-            className="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-[#E4E6EB] text-[#525866] hover:text-[#111214] cursor-pointer"
+            aria-label="Close portal sign in"
+            className="w-9 h-9 inline-flex items-center justify-center rounded-xl border border-[#E5E8EE] bg-white text-[#4B5563] hover:text-[#0B0D11] hover:border-[#C5CCD6] transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -118,9 +118,9 @@ export function AdminLoginModal({ open, onClose, onSuccess }: AdminLoginModalPro
           <div>
             <label
               htmlFor="admin-username"
-              className="block text-xs font-medium text-[#525866] mb-1.5"
+              className="block text-xs font-semibold text-[#374151] mb-1.5"
             >
-              Admin Email
+              Portal Email
             </label>
             <input
               id="admin-username"
@@ -132,15 +132,15 @@ export function AdminLoginModal({ open, onClose, onSuccess }: AdminLoginModalPro
               spellCheck={false}
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter authorized admin email"
-              className="w-full min-h-[44px] px-3.5 py-2.5 text-sm bg-[#F8F9FA] border border-[#E4E6EB] rounded-lg text-[#111214] focus:outline-none focus:border-[#111214]"
+              placeholder="Enter authorized email"
+              className="w-full min-h-[44px] px-3.5 py-2.5 text-sm bg-[#F8F9FB] border border-[#E5E8EE] rounded-xl text-[#0B0D11] focus:outline-none focus:bg-white focus:border-[#0B0D11] focus:ring-2 focus:ring-[#0B0D11]/10 transition-all"
             />
           </div>
 
           <div>
             <label
               htmlFor="admin-password"
-              className="block text-xs font-medium text-[#525866] mb-1.5"
+              className="block text-xs font-semibold text-[#374151] mb-1.5"
             >
               Password
             </label>
@@ -153,13 +153,13 @@ export function AdminLoginModal({ open, onClose, onSuccess }: AdminLoginModalPro
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter password"
-                className="w-full min-h-[44px] pl-3.5 pr-11 py-2.5 text-sm bg-[#F8F9FA] border border-[#E4E6EB] rounded-lg text-[#111214] focus:outline-none focus:border-[#111214]"
+                className="w-full min-h-[44px] pl-3.5 pr-11 py-2.5 text-sm bg-[#F8F9FB] border border-[#E5E8EE] rounded-xl text-[#0B0D11] focus:outline-none focus:bg-white focus:border-[#0B0D11] focus:ring-2 focus:ring-[#0B0D11]/10 transition-all"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 inline-flex items-center justify-center rounded-md text-[#525866] hover:text-[#111214] cursor-pointer"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 inline-flex items-center justify-center rounded-lg text-[#4B5563] hover:text-[#0B0D11] cursor-pointer"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -169,7 +169,7 @@ export function AdminLoginModal({ open, onClose, onSuccess }: AdminLoginModalPro
           {error && (
             <div
               role="alert"
-              className="p-3 rounded-lg bg-[#FEF2F2] border border-[#FECACA] text-xs font-medium text-[#B91C1C]"
+              className="p-3 rounded-xl bg-[#FEF2F2] border border-[#FECACA] text-xs font-medium text-[#B91C1C]"
             >
               {error}
             </div>
@@ -178,9 +178,9 @@ export function AdminLoginModal({ open, onClose, onSuccess }: AdminLoginModalPro
           <button
             type="submit"
             disabled={loading}
-            className="w-full min-h-[44px] px-4 py-2.5 text-sm font-semibold text-white bg-[#111214] rounded-lg hover:bg-[#272A30] disabled:opacity-60 transition-colors cursor-pointer"
+            className="w-full min-h-[44px] px-4 py-2.5 text-sm font-semibold text-white bg-[#0B0D11] rounded-xl shadow-[0_10px_24px_-10px_rgba(11,13,17,0.5)] hover:bg-[#1F242D] disabled:opacity-60 transition-all cursor-pointer"
           >
-            {loading ? 'Signing In...' : 'Sign In to Inventory'}
+            {loading ? 'Signing In...' : 'Continue to Portal'}
           </button>
         </form>
       </div>

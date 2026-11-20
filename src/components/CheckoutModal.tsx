@@ -186,14 +186,14 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[#0D0F12]/60 backdrop-blur-[2px] p-0 sm:p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[#0B0D11]/70 p-0 sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="checkout-modal-title"
     >
-      <div className="w-full sm:max-w-xl max-h-[94vh] overflow-y-auto bg-white rounded-t-2xl sm:rounded-xl border border-[#E2E5EA] shadow-2xl">
+      <div className="w-full sm:max-w-xl max-h-[94vh] overflow-y-auto bg-white rounded-t-2xl sm:rounded-2xl border border-[#E5E8EE] shadow-[0_30px_70px_-20px_rgba(11,13,17,0.45)]">
         {/* Header */}
-        <div className="sticky top-0 z-10 bg-white border-b border-[#E2E5EA] px-5 py-3.5 flex items-center justify-between gap-4">
+        <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-md border-b border-[#E5E8EE] px-5 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <ToolLogo
               name={product.name}
@@ -204,13 +204,15 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
             <div className="min-w-0">
               <h2
                 id="checkout-modal-title"
-                className="font-display text-base sm:text-lg font-bold text-[#0D0F12] truncate"
+                className="font-display text-base sm:text-lg font-bold text-[#0B0D11] truncate"
               >
                 {confirmedOrder ? 'Order Confirmed' : `Buy ${product.name}`}
               </h2>
-              <p className="text-xs text-[#525866] truncate">
+              <p className="text-xs text-[#4B5563] truncate">
                 {product.planLabel} ·{' '}
-                <span className="font-mono font-semibold text-[#0D0F12]">{priceText}</span>
+                <span className="font-mono tabular-nums font-semibold text-[#0B0D11]">
+                  {priceText}
+                </span>
               </p>
             </div>
           </div>
@@ -219,7 +221,7 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
             type="button"
             onClick={onClose}
             aria-label="Close checkout"
-            className="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-[#E2E5EA] text-[#525866] hover:text-[#0D0F12] hover:bg-[#F4F5F7] cursor-pointer shrink-0"
+            className="inline-flex items-center justify-center w-9 h-9 rounded-xl border border-[#E5E8EE] text-[#4B5563] hover:text-[#0B0D11] hover:bg-[#F6F7F9] transition-colors cursor-pointer shrink-0"
           >
             <X className="w-4 h-4" />
           </button>
@@ -352,10 +354,10 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
                           setCopiedAccount(false);
                           setError('');
                         }}
-                        className={`text-left px-3 py-2.5 rounded-lg border text-xs font-semibold transition-colors cursor-pointer min-h-[42px] flex items-center gap-2 ${
+                        className={`text-left px-3.5 py-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer min-h-[44px] flex items-center gap-2 ${
                           selected
-                            ? 'bg-[#0D0F12] text-white border-[#0D0F12]'
-                            : 'bg-white text-[#0D0F12] border-[#E2E5EA] hover:border-[#8A92A0]'
+                            ? 'bg-[#0B0D11] text-white border-[#0B0D11] shadow-[0_8px_18px_-8px_rgba(11,13,17,0.45)]'
+                            : 'bg-white text-[#0B0D11] border-[#E5E8EE] hover:border-[#9CA3AF]'
                         }`}
                       >
                         <CreditCard className="w-4 h-4 shrink-0" />
@@ -366,22 +368,22 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
                 </div>
 
                 {activeGateway && (
-                  <div className="p-3.5 rounded-xl bg-[#F8F9FA] border border-[#E2E5EA] space-y-2.5">
+                  <div className="p-4 rounded-xl bg-[#F8F9FB] border border-[#E5E8EE] space-y-2.5">
                     <div className="min-w-0">
-                      <span className="block text-[11px] font-medium text-[#525866]">
+                      <span className="block text-[11px] font-medium text-[#6B7280]">
                         Name
                       </span>
-                      <span className="text-sm font-bold text-[#0D0F12] block truncate">
+                      <span className="text-sm font-bold text-[#0B0D11] block truncate">
                         {activeGateway.accountTitle}
                       </span>
                     </div>
 
-                    <div className="pt-2 border-t border-[#E2E5EA] flex items-center justify-between gap-3">
+                    <div className="pt-2.5 border-t border-[#E5E8EE] flex items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <span className="block text-[11px] font-medium text-[#525866]">
+                        <span className="block text-[11px] font-medium text-[#6B7280]">
                           {isBinance ? 'Binance Pay ID' : 'Account Number'}
                         </span>
-                        <span className="font-mono text-base font-bold text-[#0D0F12] tracking-tight break-all">
+                        <span className="font-mono tabular-nums text-base font-bold text-[#0B0D11] tracking-tight break-all">
                           {activeGateway.accountNumber}
                         </span>
                       </div>
@@ -389,7 +391,7 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
                       <button
                         type="button"
                         onClick={() => handleCopyAccount(activeGateway.accountNumber)}
-                        className="inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-2 text-xs font-semibold bg-white border border-[#E2E5EA] rounded-lg text-[#0D0F12] hover:bg-[#F4F5F7] cursor-pointer shrink-0"
+                        className="inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-2 text-xs font-semibold bg-white border border-[#E5E8EE] rounded-xl text-[#0B0D11] hover:bg-[#F6F7F9] hover:border-[#C5CCD6] transition-colors cursor-pointer shrink-0"
                       >
                         {copiedAccount ? (
                           <Check className="w-3.5 h-3.5 text-[#059669]" />
@@ -405,7 +407,7 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
 
               {/* 2. Customer Info & Screenshot */}
               <div className="space-y-3">
-                <p className="text-sm font-semibold text-[#0D0F12]">
+                <p className="text-sm font-semibold text-[#0B0D11]">
                   2. Your Details &amp; Screenshot
                 </p>
 
@@ -413,7 +415,7 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
                   <div>
                     <label
                       htmlFor="checkout-name"
-                      className="block text-xs font-medium text-[#525866] mb-1"
+                      className="block text-xs font-medium text-[#4B5563] mb-1"
                     >
                       Your Name *
                     </label>
@@ -424,14 +426,14 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
                       placeholder="Your full name"
-                      className="w-full min-h-[42px] px-3 py-2 text-sm bg-white border border-[#E2E5EA] rounded-lg text-[#0D0F12] focus:outline-none focus:border-[#0D0F12]"
+                      className="w-full min-h-[42px] px-3.5 py-2 text-sm bg-[#F8F9FB] border border-[#E5E8EE] rounded-xl text-[#0B0D11] focus:outline-none focus:bg-white focus:border-[#0B0D11] focus:ring-2 focus:ring-[#0B0D11]/10 transition-all"
                     />
                   </div>
 
                   <div>
                     <label
                       htmlFor="checkout-whatsapp"
-                      className="block text-xs font-medium text-[#525866] mb-1"
+                      className="block text-xs font-medium text-[#4B5563] mb-1"
                     >
                       Your WhatsApp *
                     </label>
@@ -442,14 +444,14 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
                       value={customerWhatsapp}
                       onChange={(e) => setCustomerWhatsapp(e.target.value)}
                       placeholder="e.g. 923001234567"
-                      className="w-full min-h-[42px] px-3 py-2 text-sm font-mono bg-white border border-[#E2E5EA] rounded-lg text-[#0D0F12] focus:outline-none focus:border-[#0D0F12]"
+                      className="w-full min-h-[42px] px-3.5 py-2 text-sm font-mono bg-[#F8F9FB] border border-[#E5E8EE] rounded-xl text-[#0B0D11] focus:outline-none focus:bg-white focus:border-[#0B0D11] focus:ring-2 focus:ring-[#0B0D11]/10 transition-all"
                     />
                   </div>
 
                   <div>
                     <label
                       htmlFor="checkout-email"
-                      className="block text-xs font-medium text-[#525866] mb-1"
+                      className="block text-xs font-medium text-[#4B5563] mb-1"
                     >
                       Gmail (optional)
                     </label>
@@ -459,14 +461,14 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
                       value={customerEmail}
                       onChange={(e) => setCustomerEmail(e.target.value)}
                       placeholder="you@gmail.com"
-                      className="w-full min-h-[42px] px-3 py-2 text-sm bg-white border border-[#E2E5EA] rounded-lg text-[#0D0F12] focus:outline-none focus:border-[#0D0F12]"
+                      className="w-full min-h-[42px] px-3.5 py-2 text-sm bg-[#F8F9FB] border border-[#E5E8EE] rounded-xl text-[#0B0D11] focus:outline-none focus:bg-white focus:border-[#0B0D11] focus:ring-2 focus:ring-[#0B0D11]/10 transition-all"
                     />
                   </div>
 
                   <div>
                     <label
                       htmlFor="checkout-txref"
-                      className="block text-xs font-medium text-[#525866] mb-1"
+                      className="block text-xs font-medium text-[#4B5563] mb-1"
                     >
                       TID / Ref (optional)
                     </label>
@@ -476,7 +478,7 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
                       value={transactionRef}
                       onChange={(e) => setTransactionRef(e.target.value)}
                       placeholder="e.g. TID12345678"
-                      className="w-full min-h-[42px] px-3 py-2 text-sm font-mono bg-white border border-[#E2E5EA] rounded-lg text-[#0D0F12] focus:outline-none focus:border-[#0D0F12]"
+                      className="w-full min-h-[42px] px-3.5 py-2 text-sm font-mono bg-[#F8F9FB] border border-[#E5E8EE] rounded-xl text-[#0B0D11] focus:outline-none focus:bg-white focus:border-[#0B0D11] focus:ring-2 focus:ring-[#0B0D11]/10 transition-all"
                     />
                   </div>
                 </div>
@@ -546,8 +548,8 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
                 </div>
               )}
 
-              <div className="pt-2 border-t border-[#E2E5EA] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                <p className="text-xs text-[#525866]">
+              <div className="pt-3 border-t border-[#E5E8EE] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                <p className="text-xs text-[#4B5563]">
                   {screenshotDataUrl
                     ? 'Ready — click button to submit & send on WhatsApp.'
                     : 'Attach screenshot to enable Submit.'}
@@ -556,10 +558,10 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
                 <button
                   type="submit"
                   disabled={!canSubmit}
-                  className={`inline-flex items-center justify-center gap-2 min-h-[44px] px-5 py-2.5 text-sm font-semibold rounded-lg whitespace-nowrap ${
+                  className={`inline-flex items-center justify-center gap-2 min-h-[44px] px-5 py-2.5 text-sm font-semibold rounded-xl whitespace-nowrap transition-all ${
                     canSubmit
-                      ? 'bg-[#059669] text-white hover:bg-[#047857] cursor-pointer'
-                      : 'bg-[#E2E5EA] text-[#8A92A0] cursor-not-allowed'
+                      ? 'bg-[#059669] text-white shadow-[0_10px_22px_-8px_rgba(5,150,105,0.5)] hover:bg-[#047857] cursor-pointer'
+                      : 'bg-[#E5E8EE] text-[#9CA3AF] cursor-not-allowed'
                   }`}
                 >
                   <MessageCircle className="w-4 h-4" />
