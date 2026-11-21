@@ -15,12 +15,15 @@ import {
   formatUsdtAmount,
   PKR_PER_USD,
   maskApiKey,
+  normalizeCategoryList,
+  normalizeCategoryName,
   normalizeDomainInput,
   parseApiEndpointLines,
   parseKeyList,
   parseStorefrontSnapshot,
   resolveBrandKeyFromName,
   resolveCheckoutGateways,
+  resolveStoreCategories,
   sanitizeWhatsappPhone,
   selectHeroShowcaseProducts,
   validateOrderInput,
@@ -199,17 +202,33 @@ test('validateProductInput rejects invalid price and accepts valid product', () 
   );
   assert.equal(
     validateProductInput({
-      name: 'Cursor Pro',
-      category: 'Productivity',
+      name: 'Netflix 4K',
+      category: 'Streaming & OTT',
       planLabel: '1 Month',
-      price: 2500,
-      originalPrice: 5000,
+      price: 650,
       stock: 5,
-      description: 'AI code editor subscription',
-      features: ['Fast autocomplete'],
+      description: 'Private 4K UHD streaming profile with full warranty.',
+      features: ['4K HDR', 'PIN Protected'],
     }).valid,
     true
   );
+});
+
+test('normalizeCategoryName, normalizeCategoryList, and resolveStoreCategories manage custom categories safely', () => {
+  assert.equal(normalizeCategoryName('  Streaming   &  OTT  '), 'Streaming & OTT');
+  assert.deepEqual(normalizeCategoryList(['Streaming', 'streaming', '  VPN & Security ', 'x']), [
+    'Streaming',
+    'VPN & Security',
+  ]);
+  assert.ok(normalizeCategoryList([]).includes('AI Assistants'));
+
+  const customProduct: Product = {
+    ...sampleProducts[0],
+    id: 'p-custom',
+    category: 'SEO Tools',
+  };
+  const resolved = resolveStoreCategories(['AI Assistants', 'Streaming'], [customProduct]);
+  assert.deepEqual(resolved, ['AI Assistants', 'Streaming', 'SEO Tools']);
 });
 
 test('computeInventorySummary aggregates topSelling and revenue', () => {

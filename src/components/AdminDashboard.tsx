@@ -50,10 +50,13 @@ import {
   formatAutoFetchSourceLabel,
   formatCurrency,
   formatUsdAmount,
+  normalizeCategoryList,
+  normalizeCategoryName,
   normalizeDomainInput,
   parseApiEndpointLines,
   PRODUCT_CATEGORIES,
   resolveBrandKeyFromName,
+  resolveStoreCategories,
   validateProductInput,
 } from '../utils/storeLogic';
 import type { AdminAuthMode } from './AdminLoginModal';
@@ -154,6 +157,10 @@ export function AdminDashboard({
   const [refreshingAiStatus, setRefreshingAiStatus] = useState(false);
   const [autoFetchSource, setAutoFetchSource] = useState('');
   const [savingSettings, setSavingSettings] = useState(false);
+  const [newCategoryInput, setNewCategoryInput] = useState('');
+  const [formNewCategoryInput, setFormNewCategoryInput] = useState('');
+  const [addingCategoryInForm, setAddingCategoryInForm] = useState(false);
+  const [savingCategories, setSavingCategories] = useState(false);
 
   const [quickEditId, setQuickEditId] = useState<string | null>(null);
   const [quickPrice, setQuickPrice] = useState('');
@@ -796,6 +803,111 @@ export function AdminDashboard({
     }
   };
 
+  const availableCategories = resolveStoreCategories(settings?.categories, products);
+
+  const persistStoreCategories = async (
+    nextCategories: string[],
+    successMessage: string
+  ): Promise<string[] | null> => {
+    const cleaned = normalizeCategoryList(nextCategories);
+    setSavingCategories(true);
+    setError('');
+    try {
+      if (authMode === 'firebase') {
+        const updatedSettings = await updateSettingsFirestore({ categories: cleaned });
+        setSettings(updatedSettings);
+        setSettingsDraft(updatedSettings);
+        showToast(successMessage);
+        await Promise.resolve(onStoreDataChanged());
+        return updatedSettings.categories || cleaned;
+      }
+
+      const res = await adminFetch('/api/admin/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ categories: cleaned }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Failed to update categories.');
+        return null;
+      }
+      setSettings(data.settings);
+      setSettingsDraft(data.settings);
+      showToast(successMessage);
+      await Promise.resolve(onStoreDataChanged());
+      return data.settings.categories || cleaned;
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'Network error saving category.');
+      return null;
+    } finally {
+      setSavingCategories(false);
+    }
+  };
+
+  const handleAddCustomCategory = async (rawName: string, selectInProductForm = false) => {
+    const clean = normalizeCategoryName(rawName);
+    if (clean.length < 2) {
+      const msg = 'Category name must be at least 2 characters.';
+      if (selectInProductForm) setFormError(msg);
+      else setError(msg);
+      return;
+    }
+    const existingMatch = availableCategories.find(
+      (c) => c.toLowerCase() === clean.toLowerCase()
+    );
+    if (existingMatch) {
+      if (selectInProductForm) {
+        setFormState((prev) => ({ ...prev, category: existingMatch }));
+        setFormNewCategoryInput('');
+        setAddingCategoryInForm(false);
+        showToast(`Selected existing category "${existingMatch}"`);
+      } else {
+        showToast(`Category "${existingMatch}" already exists`);
+      }
+      return;
+    }
+
+    const saved = await persistStoreCategories(
+      [...availableCategories, clean],
+      `Category "${clean}" added live`
+    );
+    if (saved) {
+      if (selectInProductForm) {
+        setFormState((prev) => ({ ...prev, category: clean }));
+        setFormNewCategoryInput('');
+        setAddingCategoryInForm(false);
+        setFormError('');
+      } else {
+        setNewCategoryInput('');
+      }
+    }
+  };
+
+  const handleRemoveCustomCategory = async (categoryName: string) => {
+    const currentList = normalizeCategoryList(settings?.categories);
+    if (currentList.length <= 1) {
+      setError('At least one category must remain in the store.');
+      return;
+    }
+    const usedCount = products.filter(
+      (p) => p.category.toLowerCase() === categoryName.toLowerCase()
+    ).length;
+    if (usedCount > 0) {
+      setError(
+        `Cannot remove "${categoryName}" while ${usedCount} tool${usedCount === 1 ? ' uses' : 's use'} it. Move those tools to another category first.`
+      );
+      return;
+    }
+    const nextList = currentList.filter(
+      (c) => c.toLowerCase() !== categoryName.toLowerCase()
+    );
+    await persistStoreCategories(nextList, `Category "${categoryName}" removed`);
+    if (categoryFilter.toLowerCase() === categoryName.toLowerCase()) {
+      setCategoryFilter('All');
+    }
+  };
+
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!settingsDraft) return;
@@ -1053,7 +1165,7 @@ export function AdminDashboard({
                     className="min-h-[40px] px-3 py-2 text-sm bg-[#F4F5F7] border border-[#E2E5EA] rounded-lg text-[#0D0F12]"
                   >
                     <option value="All">All Categories</option>
-                    {PRODUCT_CATEGORIES.map((c) => (
+                    {availableCategories.map((c) => (
                       <option key={c} value={c}>
                         {c}
                       </option>
@@ -1647,6 +1759,75 @@ export function AdminDashboard({
                 </div>
               </div>
 
+              <div className="pt-4 border-t border-[#E2E5EA] space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-semibold text-[#0D0F12]">Store Categories</h3>
+                    <p className="text-xs text-[#525866]">
+                      Add custom categories so every tool goes in the right section on your storefront.
+                    </p>
+                  </div>
+                  <span className="font-mono text-[11px] text-[#525866]">
+                    {availableCategories.length}/30 categories
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {availableCategories.map((cat) => {
+                    const count = products.filter(
+                      (p) => p.category.toLowerCase() === cat.toLowerCase()
+                    ).length;
+                    return (
+                      <span
+                        key={cat}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#F4F5F7] border border-[#E2E5EA] text-xs font-medium text-[#0D0F12]"
+                      >
+                        <span>{cat}</span>
+                        <span className="font-mono text-[10px] text-[#8A92A0]">({count})</span>
+                        {availableCategories.length > 1 && count === 0 && (
+                          <button
+                            type="button"
+                            disabled={savingCategories}
+                            onClick={() => handleRemoveCustomCategory(cat)}
+                            aria-label={`Remove ${cat} category`}
+                            title={`Remove ${cat}`}
+                            className="ml-0.5 text-[#8A92A0] hover:text-[#DC2626] transition-colors cursor-pointer"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </span>
+                    );
+                  })}
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    aria-label="New category name"
+                    value={newCategoryInput}
+                    onChange={(e) => setNewCategoryInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddCustomCategory(newCategoryInput, false);
+                      }
+                    }}
+                    placeholder="Add new category (e.g. Streaming & OTT, VPN, SEO Tools)..."
+                    className="flex-1 min-h-[40px] px-3 py-2 text-xs bg-white border border-[#E2E5EA] rounded-lg"
+                  />
+                  <button
+                    type="button"
+                    disabled={savingCategories || newCategoryInput.trim().length < 2}
+                    onClick={() => handleAddCustomCategory(newCategoryInput, false)}
+                    className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 py-2 text-xs font-semibold text-white bg-[#0D0F12] rounded-lg hover:bg-[#1E222B] disabled:opacity-50 cursor-pointer whitespace-nowrap"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    {savingCategories ? 'Saving...' : 'Add Category'}
+                  </button>
+                </div>
+              </div>
+
               <div className="pt-4 border-t border-[#E2E5EA] space-y-4">
                 <h3 className="text-sm font-semibold text-[#0D0F12]">Active Payment Accounts</h3>
                 {settingsDraft.gateways.map((gw) => (
@@ -2178,12 +2359,23 @@ export function AdminDashboard({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
-                  <label
-                    htmlFor="prod-category"
-                    className="block text-xs font-medium text-[#525866] mb-1"
-                  >
-                    Category *
-                  </label>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <label
+                      htmlFor="prod-category"
+                      className="block text-xs font-medium text-[#525866]"
+                    >
+                      Category *
+                    </label>
+                    <button
+                      type="button"
+                      data-testid="toggle-new-category-btn"
+                      onClick={() => setAddingCategoryInForm((prev) => !prev)}
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#059669] hover:text-[#047857] cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" />
+                      {addingCategoryInForm ? 'Cancel' : 'New Category'}
+                    </button>
+                  </div>
                   <select
                     id="prod-category"
                     value={formState.category}
@@ -2195,12 +2387,45 @@ export function AdminDashboard({
                     }
                     className="w-full min-h-[42px] px-3 py-2 text-sm border border-[#E2E5EA] rounded-lg bg-white"
                   >
-                    {PRODUCT_CATEGORIES.map((c) => (
+                    {Array.from(
+                      new Set([
+                        ...availableCategories,
+                        ...(formState.category ? [formState.category] : []),
+                      ])
+                    ).map((c) => (
                       <option key={c} value={c}>
                         {c}
                       </option>
                     ))}
                   </select>
+
+                  {addingCategoryInForm && (
+                    <div className="mt-2 flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        data-testid="inline-new-category-input"
+                        value={formNewCategoryInput}
+                        onChange={(e) => setFormNewCategoryInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddCustomCategory(formNewCategoryInput, true);
+                          }
+                        }}
+                        placeholder="e.g. Streaming, VPN, SEO..."
+                        className="flex-1 min-h-[36px] px-2.5 py-1.5 text-xs bg-white border border-[#059669] rounded-lg focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        data-testid="inline-add-category-btn"
+                        disabled={savingCategories || formNewCategoryInput.trim().length < 2}
+                        onClick={() => handleAddCustomCategory(formNewCategoryInput, true)}
+                        className="min-h-[36px] px-3 py-1.5 text-xs font-semibold text-white bg-[#059669] rounded-lg hover:bg-[#047857] disabled:opacity-50 cursor-pointer whitespace-nowrap"
+                      >
+                        {savingCategories ? '...' : 'Add'}
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -2277,36 +2502,47 @@ export function AdminDashboard({
               </div>
 
               <div>
-                <label
-                  htmlFor="prod-desc"
-                  className="block text-xs font-medium text-[#525866] mb-1"
-                >
-                  Short Description *
-                </label>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <label
+                    htmlFor="prod-desc"
+                    className="block text-xs font-medium text-[#525866]"
+                  >
+                    Full Description *
+                  </label>
+                  <span className="font-mono text-[10.5px] text-[#8A92A0]">
+                    {formState.description.length}/1000 · Shown in full to customers
+                  </span>
+                </div>
                 <textarea
                   id="prod-desc"
                   required
-                  rows={2}
+                  rows={4}
+                  maxLength={1000}
                   value={formState.description}
                   onChange={(e) => setFormState({ ...formState, description: e.target.value })}
-                  placeholder="Describe what is included..."
-                  className="w-full px-3 py-2 text-sm border border-[#E2E5EA] rounded-lg"
+                  placeholder="Describe everything included in this tool..."
+                  className="w-full px-3 py-2 text-sm border border-[#E2E5EA] rounded-lg leading-relaxed"
                 />
               </div>
 
               <div>
-                <label
-                  htmlFor="prod-features"
-                  className="block text-xs font-medium text-[#525866] mb-1"
-                >
-                  Features (one per line)
-                </label>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <label
+                    htmlFor="prod-features"
+                    className="block text-xs font-medium text-[#525866]"
+                  >
+                    Features (one per line)
+                  </label>
+                  <span className="text-[10.5px] text-[#8A92A0]">
+                    Every line is shown in full
+                  </span>
+                </div>
                 <textarea
                   id="prod-features"
-                  rows={3}
+                  rows={4}
                   value={formState.featuresText}
                   onChange={(e) => setFormState({ ...formState, featuresText: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-[#E2E5EA] rounded-lg"
+                  className="w-full px-3 py-2 text-sm border border-[#E2E5EA] rounded-lg leading-relaxed"
                 />
               </div>
 

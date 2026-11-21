@@ -18,13 +18,8 @@
         },
         "category": {
           "type": "string",
-          "enum": [
-            "Video & Editing",
-            "AI Assistants",
-            "Design & Image",
-            "Audio & Voice",
-            "Productivity"
-          ]
+          "minLength": 2,
+          "maxLength": 60
         },
         "planLabel": {
           "type": "string",
@@ -140,6 +135,10 @@
         "deliverySla": {
           "type": "string",
           "maxLength": 300
+        },
+        "categories": {
+          "type": "array",
+          "maxItems": 30
         },
         "autoFetchEndpoints": {
           "type": "array"

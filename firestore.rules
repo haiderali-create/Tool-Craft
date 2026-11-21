@@ -49,13 +49,7 @@ service cloud.firestore {
         ])
         && isValidId(data.id)
         && data.name is string && data.name.size() >= 2 && data.name.size() <= 120
-        && data.category is string && data.category in [
-          'Video & Editing',
-          'AI Assistants',
-          'Design & Image',
-          'Audio & Voice',
-          'Productivity'
-        ]
+        && data.category is string && data.category.size() >= 2 && data.category.size() <= 60
         && data.planLabel is string && data.planLabel.size() >= 2 && data.planLabel.size() <= 100
         && data.price is number && data.price > 0 && data.price <= 10000000
         && (!('originalPrice' in data) || (data.originalPrice is number && data.originalPrice >= 0 && data.originalPrice <= 10000000))
@@ -82,7 +76,7 @@ service cloud.firestore {
         ])
         && data.keys().hasOnly([
           'storeName', 'tagline', 'whatsappNumber', 'whatsappDisplay',
-          'supportHours', 'currencySymbol', 'deliverySla',
+          'supportHours', 'currencySymbol', 'deliverySla', 'categories',
           'autoFetchEndpoints', 'gateways', 'updatedAt'
         ])
         && data.storeName is string && data.storeName.size() >= 2 && data.storeName.size() <= 80
@@ -92,6 +86,7 @@ service cloud.firestore {
         && (!('supportHours' in data) || (data.supportHours is string && data.supportHours.size() <= 80))
         && data.currencySymbol is string && data.currencySymbol.size() >= 1 && data.currencySymbol.size() <= 10
         && data.deliverySla is string && data.deliverySla.size() <= 300
+        && (!('categories' in data) || (data.categories is list && data.categories.size() >= 1 && data.categories.size() <= 30 && data.categories[0] is string && data.categories[0].size() >= 2 && data.categories[0].size() <= 60))
         && (!('autoFetchEndpoints' in data) || (data.autoFetchEndpoints is list && data.autoFetchEndpoints.size() <= 20 && (data.autoFetchEndpoints.size() == 0 || (data.autoFetchEndpoints[0] is string && data.autoFetchEndpoints[0].size() <= 500))))
         && data.gateways is list && data.gateways.size() >= 1 && data.gateways.size() <= 5
         && (!('updatedAt' in data) || data.updatedAt is timestamp);
@@ -180,7 +175,7 @@ service cloud.firestore {
         && incoming().updatedAt == request.time
         && incoming().diff(existing()).affectedKeys().hasOnly([
           'storeName', 'tagline', 'whatsappNumber', 'whatsappDisplay',
-          'supportHours', 'currencySymbol', 'deliverySla',
+          'supportHours', 'currencySymbol', 'deliverySla', 'categories',
           'autoFetchEndpoints', 'gateways', 'updatedAt'
         ]);
       allow delete: if false;

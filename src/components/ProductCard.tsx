@@ -61,22 +61,29 @@ export function ProductCard({ product, currencySymbol, onBuyNow }: ProductCardPr
         <p className="mt-1 text-xs font-medium text-[#6B7280]">{product.planLabel}</p>
       </div>
 
-      {/* Description */}
+      {/* Full Description — always 100% readable with line breaks preserved */}
       <p
-        className={`mt-3 text-sm text-[#4B5563] leading-relaxed line-clamp-2 ${
+        data-testid="product-card-description"
+        className={`mt-3 text-sm text-[#4B5563] leading-relaxed whitespace-pre-line break-words ${
           product.features.length === 0 ? 'mb-5' : ''
         }`}
       >
         {product.description}
       </p>
 
-      {/* Feature List with Crisp Checkmarks */}
+      {/* Complete Feature List (every line shown in full, zero truncation) */}
       {product.features.length > 0 && (
-        <ul className="mt-4 mb-5 pt-4 border-t border-[#F0F2F5] space-y-2.5 text-xs text-[#374151]">
-          {product.features.slice(0, 3).map((feat, idx) => (
-            <li key={idx} className="flex items-center gap-2 min-w-0">
-              <Check className="w-3.5 h-3.5 text-[#059669] shrink-0" aria-hidden="true" />
-              <span className="truncate">{feat}</span>
+        <ul
+          data-testid="product-card-features"
+          className="mt-4 mb-5 pt-4 border-t border-[#F0F2F5] space-y-2.5 text-xs text-[#374151]"
+        >
+          {product.features.map((feat, idx) => (
+            <li key={idx} className="flex items-start gap-2 min-w-0">
+              <Check
+                className="w-3.5 h-3.5 text-[#059669] shrink-0 mt-0.5"
+                aria-hidden="true"
+              />
+              <span className="leading-snug break-words">{feat}</span>
             </li>
           ))}
         </ul>

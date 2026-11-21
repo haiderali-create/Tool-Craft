@@ -21,6 +21,8 @@ import {
   buildWhatsappOrderUrl,
   formatCurrency,
   maskApiKey,
+  normalizeCategoryList,
+  normalizeCategoryName,
   normalizeDomainInput,
   parseApiEndpointLines,
   parseKeyList,
@@ -777,9 +779,10 @@ async function startServer() {
         )
       : undefined;
 
+    const cleanCategory = normalizeCategoryName(String(body.category || ''));
     const validation = validateProductInput({
       name: String(body.name || ''),
-      category: body.category as ProductCategory,
+      category: cleanCategory,
       planLabel: String(body.planLabel || ''),
       price: parsedPrice,
       originalPrice: parsedOriginal,
@@ -805,7 +808,7 @@ async function startServer() {
     const newProduct: Product = {
       id: `${slug || 'tool'}-${crypto.randomBytes(3).toString('hex')}`,
       name: cleanName,
-      category: body.category as ProductCategory,
+      category: cleanCategory,
       planLabel: String(body.planLabel || '').trim(),
       price: parsedPrice,
       originalPrice: parsedOriginal,
@@ -843,7 +846,10 @@ async function startServer() {
     const next: Product = {
       ...current,
       name: nextName,
-      category: body.category !== undefined ? body.category : current.category,
+      category:
+        body.category !== undefined
+          ? normalizeCategoryName(String(body.category))
+          : current.category,
       planLabel: body.planLabel !== undefined ? String(body.planLabel).trim() : current.planLabel,
       price: body.price !== undefined ? Number(body.price) : current.price,
       originalPrice:
@@ -967,6 +973,7 @@ async function startServer() {
       supportHours: string;
       currencySymbol: string;
       deliverySla: string;
+      categories: string[];
       autoFetchEndpoints: string[] | string;
       gateways: PaymentGatewayConfig[];
     }>;
@@ -1002,6 +1009,11 @@ async function startServer() {
     }
     if (body.deliverySla !== undefined) {
       db.settings.deliverySla = body.deliverySla.trim();
+    }
+    if (body.categories !== undefined) {
+      db.settings.categories = normalizeCategoryList(
+        Array.isArray(body.categories) ? body.categories.map((c) => String(c)) : []
+      );
     }
 
     if (body.autoFetchEndpoints !== undefined) {

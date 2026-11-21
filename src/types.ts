@@ -1,9 +1,4 @@
-export type ProductCategory =
-  | 'Video & Editing'
-  | 'AI Assistants'
-  | 'Design & Image'
-  | 'Audio & Voice'
-  | 'Productivity';
+export type ProductCategory = string;
 
 export type GatewayId = 'jazzcash' | 'easypaisa' | 'binance';
 
@@ -47,6 +42,7 @@ export interface StoreSettings {
   supportHours?: string;
   currencySymbol: string;
   deliverySla: string;
+  categories?: string[];
   autoFetchEndpoints?: string[];
   gateways: PaymentGatewayConfig[];
 }

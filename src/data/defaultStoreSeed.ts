@@ -1,4 +1,5 @@
 import type { Product, ProductCategory, StoreSettings } from '../types.ts';
+import { PRODUCT_CATEGORIES } from '../utils/storeLogic.ts';
 
 export const BRAND_PRESETS: Record<
   string,
@@ -225,6 +226,7 @@ export function createDefaultSettings(): StoreSettings {
     supportHours: 'Support 24/7',
     currencySymbol: 'Rs.',
     deliverySla: 'Send payment screenshot on WhatsApp within 15 minutes for activation',
+    categories: [...PRODUCT_CATEGORIES],
     autoFetchEndpoints: [],
     gateways: [
       {

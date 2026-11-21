@@ -139,6 +139,36 @@ export function CheckoutModal({ product, settings, onClose }: CheckoutModalProps
         </div>
 
         <div className="p-5 space-y-5">
+          {/* Full Tool Description & Included Features */}
+          {(product.description.trim() || product.features.length > 0) && (
+            <div
+              data-testid="checkout-full-details"
+              className="p-4 rounded-xl bg-[#F8F9FB] border border-[#E5E8EE] space-y-2.5"
+            >
+              <p className="text-[11px] font-mono font-semibold uppercase tracking-[0.12em] text-[#059669]">
+                What&apos;s Included · {product.category}
+              </p>
+              {product.description.trim() && (
+                <p className="text-xs sm:text-[13px] text-[#374151] leading-relaxed whitespace-pre-line break-words">
+                  {product.description}
+                </p>
+              )}
+              {product.features.length > 0 && (
+                <ul className="pt-2 border-t border-[#E5E8EE]/80 space-y-1.5 text-xs text-[#1F2937]">
+                  {product.features.map((feat, idx) => (
+                    <li key={idx} className="flex items-start gap-2 min-w-0">
+                      <Check
+                        className="w-3.5 h-3.5 text-[#059669] shrink-0 mt-0.5"
+                        aria-hidden="true"
+                      />
+                      <span className="leading-snug break-words">{feat}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
           {/* 1. Payment Method & Account Card */}
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">

@@ -16,7 +16,7 @@ import type { Product, ProductCategory, StoreSettings } from './types';
 import {
   filterAndSortProducts,
   formatEnabledGatewayNames,
-  PRODUCT_CATEGORIES,
+  resolveStoreCategories,
   selectHeroShowcaseProducts,
   type SortOption,
 } from './utils/storeLogic';
@@ -213,8 +213,15 @@ export default function App() {
     );
   }
 
+  const activeProducts = products.filter((p) => p.active);
+  const storeCategories = resolveStoreCategories(settings.categories, activeProducts);
+  const effectiveCategory =
+    selectedCategory === 'All' || storeCategories.includes(selectedCategory)
+      ? selectedCategory
+      : 'All';
+
   const visibleProducts = filterAndSortProducts(products, {
-    category: selectedCategory,
+    category: effectiveCategory,
     search: searchQuery,
     sortBy,
   });
@@ -370,8 +377,8 @@ export default function App() {
                 aria-label="Tool categories"
                 className="scroll-mt-28 flex items-center gap-1 overflow-x-auto tc-no-scrollbar"
               >
-                {(['All', ...PRODUCT_CATEGORIES] as const).map((category) => {
-                  const isActive = selectedCategory === category;
+                {(['All', ...storeCategories] as const).map((category) => {
+                  const isActive = effectiveCategory === category;
                   return (
                     <button
                       key={category}
@@ -495,6 +502,7 @@ export default function App() {
             whatsappDisplay={settings.whatsappDisplay}
             whatsappNumber={settings.whatsappNumber}
             supportHours={settings.supportHours}
+            categories={storeCategories}
             onSelectCategory={(cat) => setSelectedCategory(cat)}
             onOpenAdmin={handleOpenAdmin}
           />

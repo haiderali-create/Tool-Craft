@@ -38,6 +38,8 @@ import {
   buildLogoCandidateUrls,
   buildWhatsappOrderUrl,
   formatCurrency,
+  normalizeCategoryList,
+  normalizeCategoryName,
   normalizeDomainInput,
   parseApiEndpointLines,
   parseStorefrontSnapshot,
@@ -99,7 +101,7 @@ function normalizeProductDoc(id: string, data: Record<string, unknown>): Product
   return {
     id,
     name: String(data.name || ''),
-    category: (data.category as ProductCategory) || 'Productivity',
+    category: normalizeCategoryName(String(data.category || '')) || 'Productivity',
     planLabel: String(data.planLabel || ''),
     price: Number(data.price) || 0,
     originalPrice:
@@ -159,6 +161,9 @@ function normalizeSettingsDoc(data: Record<string, unknown>): StoreSettings {
     supportHours: String(data.supportHours || defaults.supportHours || 'Support 24/7'),
     currencySymbol: String(data.currencySymbol || defaults.currencySymbol),
     deliverySla: String(data.deliverySla ?? defaults.deliverySla),
+    categories: normalizeCategoryList(
+      Array.isArray(data.categories) ? data.categories.map((c) => String(c)) : undefined
+    ),
     autoFetchEndpoints: Array.isArray(data.autoFetchEndpoints)
       ? data.autoFetchEndpoints.map((u) => String(u))
       : [],
@@ -172,7 +177,7 @@ function buildFirestoreProductRecord(product: Product, isNew: boolean): Record<s
   const record: Record<string, unknown> = {
     id: product.id,
     name: product.name.trim().slice(0, 120),
-    category: product.category,
+    category: normalizeCategoryName(product.category) || 'Productivity',
     planLabel: product.planLabel.trim().slice(0, 100),
     price: Number(product.price),
     topSelling: Boolean(product.topSelling),
@@ -582,7 +587,7 @@ export async function updateProductFirestore(
 
   const updatePayload: Record<string, unknown> = {
     name: next.name.slice(0, 120),
-    category: next.category,
+    category: normalizeCategoryName(next.category) || 'Productivity',
     planLabel: next.planLabel.slice(0, 100),
     price: Number(next.price),
     originalPrice:
@@ -655,6 +660,11 @@ export async function updateSettingsFirestore(
       : parseApiEndpointLines(String(patch.autoFetchEndpoints));
   }
 
+  const nextCategories =
+    patch.categories !== undefined
+      ? normalizeCategoryList(patch.categories)
+      : normalizeCategoryList(current.categories);
+
   const next: StoreSettings = {
     storeName:
       patch.storeName !== undefined && patch.storeName.trim()
@@ -679,6 +689,7 @@ export async function updateSettingsFirestore(
       patch.deliverySla !== undefined
         ? patch.deliverySla.trim().slice(0, 300)
         : current.deliverySla,
+    categories: nextCategories,
     autoFetchEndpoints: nextEndpoints.slice(0, 20),
     gateways: Array.isArray(patch.gateways)
       ? current.gateways.map((existing) => {

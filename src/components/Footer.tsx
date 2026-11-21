@@ -9,6 +9,7 @@ interface FooterProps {
   whatsappDisplay: string;
   whatsappNumber: string;
   supportHours?: string;
+  categories?: string[];
   onSelectCategory: (cat: ProductCategory | 'All') => void;
   onOpenAdmin: () => void;
 }
@@ -19,9 +20,12 @@ export function Footer({
   whatsappDisplay,
   whatsappNumber,
   supportHours = 'Support 24/7',
+  categories,
   onSelectCategory,
   onOpenAdmin,
 }: FooterProps) {
+  const displayCategories =
+    categories && categories.length > 0 ? categories : PRODUCT_CATEGORIES;
   const footerWhatsappUrl = buildWhatsappSupportUrl(
     whatsappNumber,
     `Assalam o Alaikum! I need support from ${storeName} regarding Pro Subscriptions.`
@@ -62,7 +66,7 @@ export function Footer({
               Categories
             </p>
             <ul className="space-y-2.5 text-sm text-[#D1D5DB]">
-              {PRODUCT_CATEGORIES.map((cat) => (
+              {displayCategories.map((cat) => (
                 <li key={cat}>
                   <a
                     href="#catalog"

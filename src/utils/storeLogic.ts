@@ -15,6 +15,57 @@ export const PRODUCT_CATEGORIES: ProductCategory[] = [
   'Productivity',
 ];
 
+export const MAX_STORE_CATEGORIES = 30;
+
+export function normalizeCategoryName(raw: string): string {
+  return String(raw || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .slice(0, 60);
+}
+
+export function normalizeCategoryList(categories?: string[] | null): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  if (Array.isArray(categories)) {
+    for (const raw of categories) {
+      const clean = normalizeCategoryName(raw);
+      if (clean.length < 2) continue;
+      const key = clean.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(clean);
+      }
+      if (result.length >= MAX_STORE_CATEGORIES) break;
+    }
+  }
+
+  return result.length > 0 ? result : [...PRODUCT_CATEGORIES];
+}
+
+export function resolveStoreCategories(
+  settingsCategories?: string[] | null,
+  products: Product[] = []
+): string[] {
+  const base = normalizeCategoryList(settingsCategories);
+  const seen = new Set(base.map((c) => c.toLowerCase()));
+  const merged = [...base];
+
+  for (const item of products) {
+    const clean = normalizeCategoryName(item.category);
+    if (clean.length < 2) continue;
+    const key = clean.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      merged.push(clean);
+    }
+    if (merged.length >= MAX_STORE_CATEGORIES) break;
+  }
+
+  return merged;
+}
+
 export type SortOption = 'featured' | 'price-asc' | 'price-desc' | 'name-asc';
 
 export interface ProductFilterOptions {
@@ -253,8 +304,9 @@ export function validateProductInput(input: ProductInput): ValidationResult {
   if (!input.name || input.name.trim().length < 2) {
     return { valid: false, error: 'Tool name must be at least 2 characters.' };
   }
-  if (!PRODUCT_CATEGORIES.includes(input.category)) {
-    return { valid: false, error: 'Please choose a valid category.' };
+  const cleanCategory = normalizeCategoryName(input.category);
+  if (cleanCategory.length < 2 || cleanCategory.length > 60) {
+    return { valid: false, error: 'Please choose or add a valid category (2 to 60 characters).' };
   }
   if (!input.planLabel || input.planLabel.trim().length < 2) {
     return { valid: false, error: 'Plan label is required (e.g. 1 Month · Private).' };
